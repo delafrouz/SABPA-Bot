@@ -7,7 +7,7 @@ from ..data_models.team import Team
 from ..data_models.user import User
 
 
-async def choose_random_reviewer(text: str, group_name: str, owner: User, other_reviewer: Union[User, None]) -> User:
+def choose_random_reviewer(text: str, group_name: str, owner: User, other_reviewer: Union[User, None]) -> User:
     meaningful_text = text[text.find('-'):]
     flags = ['-' + e for e in meaningful_text.split('-') if e]
     team = None
@@ -15,19 +15,19 @@ async def choose_random_reviewer(text: str, group_name: str, owner: User, other_
         if flag.startswith('-t '):
             if len(flag.split('-t ')) < 2:
                 raise Exception('تیم پول‌ریکوئست رو درست وارد نکردی!')
-            team = await Team.get_from_db(group_name, flag.split('-t ')[1].strip())
+            team = Team.get_from_db(group_name, flag.split('-t ')[1].strip())
             if not team:
                 raise Exception('تیم پول‌ریکوئست رو درست وارد نکردی!')
 
-    all_members = await team.get_members()
+    all_members = team.get_members()
     team_members = sorted([member for member in all_members if member.telegram_id != owner.telegram_id],
                           key=lambda m: m.workload,
                           reverse=True)
-    owner_teams = await owner.get_teams()
+    owner_teams = owner.get_teams()
     non_isolated_team_members = []
     for member in team_members:
         should_add = True
-        teams = await member.get_teams()
+        teams = member.get_teams()
         for team in teams:
             if team.team_type == 'isolated' and team not in owner_teams:
                 should_add = False
@@ -47,7 +47,7 @@ async def choose_random_reviewer(text: str, group_name: str, owner: User, other_
             # This member is not really very busy
             top_workloads -= 1
             if top_workloads > 0:
-                if non_isolated_team_members[top_workloads - 1].workload ==\
+                if non_isolated_team_members[top_workloads - 1].workload == \
                         non_isolated_team_members[top_workloads].workload:
                     # This member is not really very busy
                     top_workloads -= 1
@@ -65,9 +65,9 @@ async def choose_random_reviewer(text: str, group_name: str, owner: User, other_
     return random_reviewer
 
 
-async def is_reviewer_busy(pr: PullRequest, reviewer: User) -> bool:
-    pr_team = await Team.get_from_db(pr.group_name, pr.team)
-    all_members = await pr_team.get_members()
+def is_reviewer_busy(pr: PullRequest, reviewer: User) -> bool:
+    pr_team = Team.get_from_db(pr.group_name, pr.team)
+    all_members = pr_team.get_members()
     team_members = sorted([
         member for member in all_members
         if member.telegram_id != pr.owner
@@ -97,10 +97,10 @@ async def is_reviewer_busy(pr: PullRequest, reviewer: User) -> bool:
     return False
 
 
-async def is_reviewer_isolated(pr: PullRequest, reviewer: User) -> Tuple[Optional[Team], bool]:
-    reviewer_teams = await reviewer.get_teams()
-    owner = await User.get_from_db(pr.group_name, pr.owner)
-    owner_teams = await owner.get_teams()
+def is_reviewer_isolated(pr: PullRequest, reviewer: User) -> Tuple[Optional[Team], bool]:
+    reviewer_teams = reviewer.get_teams()
+    owner = User.get_from_db(pr.group_name, pr.owner)
+    owner_teams = owner.get_teams()
     for team in reviewer_teams:
         if team.team_type == 'isolated':
             if team in owner_teams:
@@ -109,12 +109,12 @@ async def is_reviewer_isolated(pr: PullRequest, reviewer: User) -> Tuple[Optiona
     return None, False
 
 
-async def request_review(text: str, group_name: str, owner_username: str) -> PullRequest:
+def request_review(text: str, group_name: str, owner_username: str) -> PullRequest:
     meaningful_text = text[text.find('-'):]
     flags = ['-' + e for e in meaningful_text.split('-') if e]
     title = ''
     owner_username = owner_username if owner_username.startswith('@') else f'@{owner_username}'
-    owner = await User.get_from_db(group_name, owner_username)
+    owner = User.get_from_db(group_name, owner_username)
     reviewer = None
     assignee = None
     team = None
@@ -131,7 +131,7 @@ async def request_review(text: str, group_name: str, owner_username: str) -> Pul
         elif flag.startswith('-t '):
             if len(flag.split('-t ')) < 2:
                 raise Exception('تیم پول‌ریکوئست رو درست وارد نکردی!')
-            team = await Team.get_from_db(group_name, flag.split('-t ')[1].strip())
+            team = Team.get_from_db(group_name, flag.split('-t ')[1].strip())
             if not team:
                 raise Exception('تیم پول‌ریکوئست رو درست وارد نکردی!')
 
@@ -147,18 +147,18 @@ async def request_review(text: str, group_name: str, owner_username: str) -> Pul
                 raise Exception('ریویوئر پول‌ریکوئست رو درست وارد نکردی!')
             reviewer_name = flag.split('-r ')[1].strip()
             if reviewer_name == 'random':
-                reviewer = await choose_random_reviewer(text, group_name, owner, assignee)
+                reviewer = choose_random_reviewer(text, group_name, owner, assignee)
             else:
                 if reviewer_name == owner_username:
                     raise Exception('نمی‌تونی خودت ریویوئر پول ریکوئست خودت باشی که!')
-                reviewer = await User.get_from_db(group_name, reviewer_name)
+                reviewer = User.get_from_db(group_name, reviewer_name)
 
         elif flag.startswith('-a '):
             if len(flag.split('-a ')) < 2:
                 raise Exception('اساینی پول‌ریکوئست رو درست وارد نکردی!')
             assignee_name = flag.split('-a ')[1].strip()
             if assignee_name == 'random':
-                assignee = await choose_random_reviewer(text, group_name, owner, reviewer)
+                assignee = choose_random_reviewer(text, group_name, owner, reviewer)
             else:
                 if assignee_name == owner_username:
                     raise Exception('نمی‌تونی خودت ریویوئر پول ریکوئست خودت باشی که!')
@@ -176,35 +176,36 @@ async def request_review(text: str, group_name: str, owner_username: str) -> Pul
         else:
             raise Exception('این پیغام رو بلد نبودم هندل کنم. برای راهنمایی دوباره /help رو ببین.')
 
-    # Should get or create
-    return await PullRequest.get_or_create(owner=owner,
-                                           title=title,
-                                           group_name=group_name,
-                                           team=team,
-                                           urgency=urgency,
-                                           reviewer=reviewer,
-                                           assignee=assignee,
-                                           added_changes=added_changes,
-                                           removed_changes=removed_changes)
+    return PullRequest.get_or_create(owner=owner.telegram_id,
+                                     title=title,
+                                     group_name=group_name,
+                                     team=team.name,
+                                     urgency=urgency,
+                                     reviewer=reviewer.telegram_id,
+                                     assignee=assignee.telegram_id,
+                                     added_changes=added_changes,
+                                     removed_changes=removed_changes)
 
 
-async def create_request_response(text: str, group_name: str, owner_username: str) -> str:
-    pr = await request_review(text=text, group_name=group_name, owner_username=owner_username)
+def create_request_response(text: str, group_name: str, owner_username: str) -> str:
+    owner_username = owner_username if owner_username.startswith('@') else '@' + owner_username
+    pr = request_review(text=text, group_name=group_name, owner_username=owner_username)
+
     if owner_username != pr.owner:
         raise Exception('شما اجازه‌ی دسترسی به این پی‌آر رو نداری')
-    await pr.set_in_db()
-    reviewer = await User.get_from_db(pr.group_name, pr.reviewer)
-    assignee = await User.get_from_db(pr.group_name, pr.assignee)
+    pr.set_in_db()
+    reviewer = User.get_from_db(pr.group_name, pr.reviewer)
+    assignee = User.get_from_db(pr.group_name, pr.assignee)
 
     reviewer_response = ''
     assignee_response = ''
     response_info = ''
     if not reviewer:
         reviewer_response = 'برای ریویوی اول کسی رو انتخاب نکردی.'
-    elif await is_reviewer_busy(pr, reviewer):
+    elif is_reviewer_busy(pr, reviewer):
         reviewer_response = f'کاربر {reviewer.first_name} یه کم سرش شلوغه. لطفا یکی دیگه رو انتخاب کن.'
     else:
-        isolated_team, reviewer_isolated = await is_reviewer_isolated(pr, reviewer)
+        isolated_team, reviewer_isolated = is_reviewer_isolated(pr, reviewer)
         if reviewer_isolated:
             reviewer_response = f'کاربر {reviewer.first_name} عضو تیم {isolated_team.name} عه و نمی‌تونه از شما پی‌آر ببینه.'
         else:
@@ -212,10 +213,10 @@ async def create_request_response(text: str, group_name: str, owner_username: st
 
     if not assignee:
         assignee_response = 'برای ریویوی دوم کسی رو انتخاب نکردی.'
-    elif await is_reviewer_busy(pr, assignee):
+    elif is_reviewer_busy(pr, assignee):
         assignee_response = f'کاربر {assignee.first_name} یه کم سرش شلوغه. لطفا یکی دیگه رو انتخاب کن.'
     else:
-        isolated_team, reviewer_isolated = await is_reviewer_isolated(pr, assignee)
+        isolated_team, reviewer_isolated = is_reviewer_isolated(pr, assignee)
         if reviewer_isolated:
             assignee_response = f'کاربر {assignee.first_name} عضو تیم {isolated_team.name} عه و نمی‌تونه از شما پی‌آر ببینه.'
         else:

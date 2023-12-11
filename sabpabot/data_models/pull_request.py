@@ -2,8 +2,6 @@ import math
 from decimal import Decimal
 from typing import Union, List, Dict
 
-from sabpabot.data_models.team import Team
-from sabpabot.data_models.user import User
 from sabpabot.mongo_access import mongo_db
 
 PR_URGENCY = {'normal', 'urgent', 'critical'}
@@ -13,16 +11,16 @@ class PullRequest:
     PR_LINE_TO_POINT = 30
     PR_COLLECTION = 'PullRequests'
 
-    def __init__(self, owner: User, title: str, group_name: str, team: Team = None, reviewer: User = None,
-                 assignee: User = None, reviewer_confirmed: bool = False, assignee_confirmed: bool = False,
+    def __init__(self, owner: str, title: str, group_name: str, team: str = '', reviewer: str = '',
+                 assignee: str = '', reviewer_confirmed: bool = False, assignee_confirmed: bool = False,
                  review_finished: bool = False, assign_finished: bool = False, urgency: str = 'normal',
                  added_changes: int = 0, removed_changes: int = 0):
-        self.owner: str = owner.telegram_id
+        self.owner: str = owner
         self.title: str = title
         self.group_name: str = group_name
-        self.team: str = team.name
-        self.reviewer: str = reviewer.telegram_id
-        self.assignee: str = assignee.telegram_id
+        self.team: str = team
+        self.reviewer: str = reviewer
+        self.assignee: str = assignee
         self.reviewer_confirmed: bool = reviewer_confirmed
         self.assignee_confirmed: bool = assignee_confirmed
         self.review_finished: bool = review_finished
@@ -86,34 +84,34 @@ class PullRequest:
                            removed_changes=removed_changes)
 
     @classmethod
-    async def get_from_db(cls, group_name: str, title: str) -> 'PullRequest':
+    def get_from_db(cls, group_name: str, title: str) -> 'PullRequest':
         try:
             pr_info = \
-                await mongo_db[cls.PR_COLLECTION].find_one({'group_name': group_name, 'title': title})
+                mongo_db[cls.PR_COLLECTION].find_one({'group_name': group_name, 'title': title})
             pr = PullRequest.from_json(pr_info)
             if not pr:
                 raise Exception(f'نتونستم پول ریکوئست {title} رو پیدا کنم! :(')
         except Exception as e:
-            raise Exception(f'نتونستم کاربر {title} رو پیدا کنم! :(')
+            raise Exception(f'نتونستم پول ریکوئست {title} رو پیدا کنم! :(')
         return pr
 
-    async def set_in_db(self):
+    def set_in_db(self):
         try:
-            await mongo_db[self.PR_COLLECTION].insert_one(self.to_json())
+            mongo_db[self.PR_COLLECTION].insert_one(self.to_json())
         except Exception as e:
             raise Exception(f'نتونستم پول ریکوئست {self.title} رو بریزم توی دیتابیس! :(')
 
     @classmethod
-    async def get_or_create(cls, owner: User, title: str, group_name: str, team: Team,
-                            urgency: str, reviewer: User, assignee: User,
-                            added_changes: int, removed_changes: int) -> 'PullRequest':
+    def get_or_create(cls, owner: str, title: str, group_name: str, team: str,
+                      urgency: str, reviewer: str, assignee: str,
+                      added_changes: int, removed_changes: int) -> 'PullRequest':
         try:
-            pr = await cls.get_from_db(group_name, title)
+            pr = cls.get_from_db(group_name, title)
             if pr:
-                pr.team = team.name if team else pr.team
+                pr.team = team if team else pr.team
                 pr.urgency = urgency if urgency else pr.urgency
-                pr.reviewer = reviewer.telegram_id if reviewer else pr.reviewer
-                pr.assignee = assignee.telegram_id if assignee else pr.assignee
+                pr.reviewer = reviewer if reviewer else pr.reviewer
+                pr.assignee = assignee if assignee else pr.assignee
                 pr.added_changes = added_changes if added_changes else pr.added_changes
                 pr.removed_changes = removed_changes if removed_changes else pr.removed_changes
                 return pr
@@ -121,28 +119,38 @@ class PullRequest:
             pr = PullRequest(owner=owner, title=title, group_name=group_name, team=team, reviewer=reviewer,
                              assignee=assignee, urgency=urgency, added_changes=added_changes,
                              removed_changes=removed_changes)
-            await pr.set_in_db()
+            pr.set_in_db()
             return pr
 
     @classmethod
-    async def get_all_prs(cls, group_name: str, **kwargs) -> Union[List['PullRequest'], None]:
+    def get_all_prs(cls, group_name: str, **kwargs) -> Union[List['PullRequest'], None]:
         try:
-            db_prs = await mongo_db[cls.PR_COLLECTION].find({'group_name': group_name, **kwargs})
+            db_prs = mongo_db[cls.PR_COLLECTION].find({'group_name': group_name, **kwargs})
             prs = [PullRequest.from_json(db_pr) for db_pr in db_prs]
             return prs
         except Exception as e:
             raise Exception(f'نتونستم پول ریکوئستی توی گروه {group_name} پیدا کنم! :(')
 
     @classmethod
-    async def get_user_reviews(cls, group_name: str, telegram_id: str, reviewer_confirmed: bool = True,
-                               review_finished: bool = False) -> Union[List['PullRequest'], None]:
-        return await cls.get_all_prs(
+    def get_user_reviews(cls, group_name: str, telegram_id: str, reviewer_confirmed: bool = True,
+                         review_finished: bool = False) -> Union[List['PullRequest'], None]:
+        return cls.get_all_prs(
             group_name, reviewer=telegram_id, reviewer_confirmed=reviewer_confirmed, review_finished=review_finished
         )
 
     @classmethod
-    async def get_user_assigns(cls, group_name: str, telegram_id: str, assignee_confirmed: bool = False,
-                               assign_finished: bool = False) -> Union[List['PullRequest'], None]:
-        return await cls.get_all_prs(
+    def get_user_assigns(cls, group_name: str, telegram_id: str, assignee_confirmed: bool = False,
+                         assign_finished: bool = False) -> Union[List['PullRequest'], None]:
+        return cls.get_all_prs(
             group_name, reviewer=telegram_id, assignee_confirmed=assignee_confirmed, assign_finished=assign_finished
         )
+
+    def update_in_db(self, group_name: str, title: str):
+        try:
+            update_keys = self.to_json()
+            update_keys.pop('group_name')
+            update_keys.pop('title')
+            mongo_db[self.PR_COLLECTION].update_one({'group_name': group_name, 'title': title},
+                                                    {'$set': update_keys})
+        except Exception as e:
+            raise Exception(f'نتونستم پول ریکوئست {title} رو پیدا کنم! :(')

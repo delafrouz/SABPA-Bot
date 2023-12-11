@@ -1,4 +1,3 @@
-import asyncio
 from typing import Dict, Union, List
 
 from sabpabot.data_models.user import User
@@ -17,26 +16,26 @@ class Team:
         self.group_name = group_name
         self.team_type = team_type if team_type else 'general'
 
-    async def add_member(self, user: User):
+    def add_member(self, user: User):
         try:
-            await mongo_db[self.MEMBERSHIP_COLLECTION].insert_one(
+            mongo_db[self.MEMBERSHIP_COLLECTION].insert_one(
                 {'group_name': self.group_name, 'user_id': user.telegram_id, 'team_name': self.name}
             )
         except Exception as e:
             raise Exception(f'نتونستم کاربر {user.telegram_id[1:]} رو بندازم توی تیم {self.name}! :(')
 
-    async def get_members(self) -> List[User]:
+    def get_members(self) -> List[User]:
         try:
             db_user_ids = (
                 mongo_db[self.MEMBERSHIP_COLLECTION]
                 .find(
                     {'group_name': self.group_name, 'team_name': self.name},
-                    {'_id': 0, 'group_name': 0, 'user_id': 1, 'team_name': 0}
+                    {'_id': 0, 'user_id': 1}
                 )
             )
-            user_ids = [user_id['user_id'] for user_id in db_user_ids]
-            user_coroutines = [User.get_from_db(group_name=self.group_name, telegram_id=user_id) for user_id in user_ids]
-            users = await asyncio.gather(*user_coroutines)
+            users = []
+            for db_user_id in db_user_ids:
+                users.append(User.get_from_db(group_name=self.group_name, telegram_id=db_user_id['user_id']))
             return users
         except Exception as e:
             return []
@@ -56,10 +55,9 @@ class Team:
         return Team(name=name, group_name=group_name, team_type=team_type)
 
     @classmethod
-    async def get_from_db(cls, group_name: str, name: str) -> 'Team':
+    def get_from_db(cls, group_name: str, name: str) -> 'Team':
         try:
-            team_info = \
-                await mongo_db[cls.TEAM_COLLECTION].find_one({'group_name': group_name, 'name': name})
+            team_info = mongo_db[cls.TEAM_COLLECTION].find_one({'group_name': group_name, 'name': name})
             team = Team.from_json(team_info)
             if not team:
                 raise Exception(f'نتونستم تیم {name} رو پیدا کنم! :(')
@@ -67,16 +65,16 @@ class Team:
             raise Exception(f'نتونستم تیم {name} رو پیدا کنم! :(')
         return team
 
-    async def set_in_db(self):
+    def set_in_db(self):
         try:
-            await mongo_db[self.TEAM_COLLECTION].insert_one(self.to_json())
+            mongo_db[self.TEAM_COLLECTION].insert_one(self.to_json())
         except Exception as e:
             raise Exception(f'نتونستم تیم {self.name} رو بریزم توی دیتابیس! :(')
 
     @classmethod
-    async def get_all_teams(cls, group_name: str) -> Union[List['Team'], None]:
+    def get_all_teams(cls, group_name: str) -> Union[List['Team'], None]:
         try:
-            db_teams = await mongo_db[cls.TEAM_COLLECTION].find({'group_name': group_name})
+            db_teams = mongo_db[cls.TEAM_COLLECTION].find({'group_name': group_name})
             teams = [Team.from_json(db_team) for db_team in db_teams]
             return teams
         except Exception as e:

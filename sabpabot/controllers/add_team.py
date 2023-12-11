@@ -5,7 +5,7 @@ from sabpabot.data_models.team import Team, TEAM_GROUP_TYPES
 from sabpabot.data_models.user import User
 
 
-async def create_team_and_members(team_info: str, group_name: str) -> Tuple[Team, List[User]]:
+def create_team_and_members(team_info: str, group_name: str) -> Tuple[Team, List[User]]:
     """
     Create a team and members from the given team_info.
     """
@@ -52,11 +52,11 @@ async def create_team_and_members(team_info: str, group_name: str) -> Tuple[Team
                                              2] if idx + 2 < len(member_infos) else ''
                     if last_name.startswith('@'):
                         last_name = ''
-                    user = await User.get_or_create(group_name=group_name,
-                                                    first_name=first_name,
-                                                    last_name=last_name,
-                                                    telegram_id=member_id,
-                                                    workload=Decimal(0))
+                    user = User.get_or_create(group_name=group_name,
+                                              first_name=first_name,
+                                              last_name=last_name,
+                                              telegram_id=member_id,
+                                              workload=Decimal(0))
                     members.append(user)
                     idx += (3 if last_name else 2)
             else:
@@ -66,16 +66,15 @@ async def create_team_and_members(team_info: str, group_name: str) -> Tuple[Team
     team = Team(name=team_name,
                 group_name=group_name,
                 team_type=group_type)
-    await team.set_in_db()
+    team.set_in_db()
     for member in members:
-        await member.add_team(team)
-        await member.set_in_db()
+        member.add_team(team)
     return team, members
 
 
-async def create_teams(text: str, group_name: str) -> List[Tuple[Team, List[User]]]:
+def create_teams(text: str, group_name: str) -> List[Tuple[Team, List[User]]]:
     teams = text.split(';')
     results = []
     for team_info in teams:
-        results.append(await create_team_and_members(team_info.strip(), group_name))
+        results.append(create_team_and_members(team_info.strip(), group_name))
     return results

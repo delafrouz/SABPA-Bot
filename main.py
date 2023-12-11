@@ -28,7 +28,7 @@ async def add_team(update: Update, context: ContextTypes.DEFAULT_TYPE):
     group_name = update.message.chat.title or update.message.from_user.username
     print(f'group name is {group_name}')
     try:
-        results = await create_teams(text, group_name)
+        results = create_teams(text, group_name)
         message_reply = ''
         for (team, members) in results:
             message_reply += (f'تیم {team.name} با این اعضا ساخته شد: ' +
@@ -42,11 +42,11 @@ async def add_team(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def get_team(update: Update, context: ContextTypes.DEFAULT_TYPE):
     input_message = update.message.text
-    text = input_message[input.find('-'):]
+    text = input_message[input_message.find('-'):]
 
     group_name = update.message.chat.title or update.message.from_user.username
     try:
-        team = await get_team_by_name(text, group_name)
+        team = get_team_by_name(text, group_name)
         print(f'team is {team}')
         await update.message.reply_text(team)
     except Exception as e:
@@ -57,7 +57,7 @@ async def get_team(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def get_teams(update: Update, context: ContextTypes.DEFAULT_TYPE):
     group_name = update.message.chat.title or update.message.from_user.username
     print(f'group name is {group_name}')
-    teams = await Team.get_all_teams(group_name)
+    teams = Team.get_all_teams(group_name)
     if not teams:
         await update.message.reply_text('در حال حاضر هیچ تیمی ساخته نشده است.')
         return
@@ -74,7 +74,7 @@ async def review(update: Update, context: ContextTypes.DEFAULT_TYPE):
     group_name = update.message.chat.title or update.message.from_user.username
 
     try:
-        result = await create_request_response(text, group_name, owner)
+        result = create_request_response(text, group_name, owner)
     except Exception as e:
         await update.message.reply_text(f'نتونستم درخواست ریویو بدم چون که {e}')
         raise e
@@ -89,7 +89,7 @@ async def accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
     group_name = update.message.chat.title or update.message.from_user.username
 
     try:
-        result = await accept_review(accepter, group_name, text)
+        result = accept_review(accepter, group_name, text)
         await update.message.reply_text(result)
     except Exception as e:
         await update.message.reply_text(f'این درخواست ریویو رو نتونستم از طرفت قبول کنم چون که {e}')
@@ -104,7 +104,7 @@ async def finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
     group_name = update.message.chat.title or update.message.from_user.username
 
     try:
-        result = await finish_review(finisher, group_name, text)
+        result = finish_review(finisher, group_name, text)
         await update.message.reply_text(result)
     except Exception as e:
         await update.message.reply_text(f'این درخواست ریویو رو نتونستم از طرفت تموم کنم چون که {e}')
@@ -113,7 +113,7 @@ async def finish(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     group_name = update.message.chat.title or update.message.from_user.username
-    users = await User.get_all_users(group_name)
+    users = User.get_all_users(group_name)
     if not users:
         await update.message.reply_text('در حال حاضر هیچ کاربری ساخته نشده است.')
         return
@@ -124,7 +124,7 @@ async def users(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def prs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     group_name = update.message.chat.title or update.message.from_user.username
-    prs = await PullRequest.get_all_prs(group_name)
+    prs = PullRequest.get_all_prs(group_name)
 
     if not prs:
         await update.message.reply_text('در حال حاضر هیچ پی‌آری ساخته نشده است.')
