@@ -193,7 +193,7 @@ def create_request_response(text: str, group_name: str, owner_username: str) -> 
 
     if owner_username != pr.owner:
         raise Exception('شما اجازه‌ی دسترسی به این پی‌آر رو نداری')
-    pr.set_in_db()
+
     reviewer = User.get_from_db(pr.group_name, pr.reviewer)
     assignee = User.get_from_db(pr.group_name, pr.assignee)
 
