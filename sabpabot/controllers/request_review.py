@@ -68,10 +68,22 @@ def choose_random_reviewer(text: str, group_name: str, owner: User, other_review
 def is_reviewer_busy(pr: PullRequest, reviewer: User) -> bool:
     pr_team = Team.get_from_db(pr.group_name, pr.team)
     all_members = pr_team.get_members()
-    team_members = sorted([
-        member for member in all_members
-        if member.telegram_id != pr.owner
-    ], key=lambda m: m.workload, reverse=True)
+    members_except_owner = [member for member in all_members if member.telegram_id != pr.owner]
+
+    owner = User.get_from_db(pr.group_name, pr.owner)
+    owner_teams = owner.get_teams()
+    non_isolated_team_members = []
+    for member in members_except_owner:
+        should_add = True
+        teams = member.get_teams()
+        for team in teams:
+            if team.team_type == 'isolated' and team not in owner_teams:
+                should_add = False
+        if should_add:
+            non_isolated_team_members.append(member)
+
+    team_members = sorted(non_isolated_team_members, key=lambda m: m.workload, reverse=True)
+
     top_workloads = 2
     if 2 < len(team_members) < 4:
         top_workloads = 1

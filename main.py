@@ -119,7 +119,8 @@ async def users(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     await update.message.reply_text(
         'لیست کاربرهای گروه شما موجود در سامانه‌ی برنامه ریزی پی‌آر:\n- ' +
-        '\n- '.join(f'کاربر {user.full_name} با حجم کاری {f"{user.workload:.{3}f}"} و {user.finished_reviews} پی‌آر تموم شده' for user in users))
+        '\n- '.join(f'کاربر {user.full_name} با حجم کاری {f"{user.workload:.{3}f}"} و {user.finished_reviews} پی‌آر '
+                    f'تموم شده' for user in users))
 
 
 async def prs(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -131,7 +132,9 @@ async def prs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     await update.message.reply_text(
         'لیست پی‌آرهای گروه شما موجود در سامانه‌ی برنامه ریزی پی‌آر:\n- ' +
-        '\n- '.join(f'پی‌آر {pr.title} با تغییرات +{pr.added_changes}/-{pr.removed_changes} از {pr.owner} با ریویوئر اول {pr.reviewer} و ریویوئر دوم {pr.assignee} و وضعیت {pr.status} از جنس {pr.urgency}' for pr in prs))
+        '\n- '.join(f'پی‌آر {pr.title} با تغییرات +{pr.added_changes}/-{pr.removed_changes} از {pr.owner} با ریویوئر '
+                    f'اول {pr.reviewer} و ریویوئر دوم {pr.assignee} و وضعیت {pr.status} از جنس {pr.urgency}' for pr
+                    in prs))
 
 
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
