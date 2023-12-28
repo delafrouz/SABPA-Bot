@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from sabpabot.controllers.request_review import create_request_response
+from sabpabot.controllers.request_review import PullRequestController
 
 
 async def review(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -12,7 +12,7 @@ async def review(update: Update, context: ContextTypes.DEFAULT_TYPE):
     group_name = update.message.chat.title or update.message.from_user.username
 
     try:
-        result = create_request_response(text, group_name, owner)
+        result = PullRequestController.get_review_response(text, group_name, owner)
     except Exception as e:
         await update.message.reply_text(f'نتونستم درخواست ریویو بدم چون که {e}')
         raise e
