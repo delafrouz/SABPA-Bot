@@ -8,120 +8,6 @@ from ..data_models.team import Team
 from ..data_models.user import User
 
 
-def choose_random_reviewer(text: str, group_name: str, owner: User, other_reviewer: Optional[User]) -> User:
-    meaningful_text = text[text.find('-'):]
-    flags = ['-' + e for e in meaningful_text.split('-') if e]
-    team = None
-    for flag in flags:
-        if flag.startswith('-t '):
-            if len(flag.split('-t ')) < 2:
-                raise Exception('تیم پول‌ریکوئست رو درست وارد نکردی!')
-            team = Team.get_from_db(group_name, flag.split('-t ')[1].strip())
-            if not team:
-                raise Exception('تیم پول‌ریکوئست رو درست وارد نکردی!')
-
-    all_members = team.get_members()
-    team_members = sorted([member for member in all_members if member.telegram_id != owner.telegram_id],
-                          key=lambda m: m.workload,
-                          reverse=True)
-    owner_teams = owner.get_teams()
-    non_isolated_team_members = []
-    for member in team_members:
-        should_add = True
-        teams = member.get_teams()
-        for team in teams:
-            if team.team_type == 'isolated' and team not in owner_teams:
-                should_add = False
-        if should_add:
-            non_isolated_team_members.append(member)
-
-    print(f'non_isolated_team_members: {non_isolated_team_members}')
-
-    top_workloads = 2
-    if 2 < len(non_isolated_team_members) < 4:
-        top_workloads = 1
-    elif len(non_isolated_team_members) <= 2:
-        top_workloads = 0
-
-    if top_workloads > 0:
-        if non_isolated_team_members[top_workloads - 1].workload == non_isolated_team_members[top_workloads].workload:
-            # This member is not really very busy
-            top_workloads -= 1
-            if top_workloads > 0:
-                if non_isolated_team_members[top_workloads - 1].workload == \
-                        non_isolated_team_members[top_workloads].workload:
-                    # This member is not really very busy
-                    top_workloads -= 1
-
-    candids = non_isolated_team_members[top_workloads:]
-    print(f'candids: ' + ', '.join(candid.full_name for candid in candids))
-    if other_reviewer:
-        final_candids = [candid for candid in candids if candid != other_reviewer]
-    else:
-        final_candids = candids
-    print(f'final candids: ' + ', '.join(candid.full_name for candid in final_candids))
-
-    random_reviewer = random.choice(final_candids)
-    print(f'random reviewer is {random_reviewer.full_name}')
-    return random_reviewer
-
-
-def is_reviewer_busy(pr: PullRequest, reviewer: User) -> bool:
-    pr_team = Team.get_from_db(pr.group_name, pr.team)
-    all_members = pr_team.get_members()
-    members_except_owner = [member for member in all_members if member.telegram_id != pr.owner]
-
-    owner = User.get_from_db(pr.group_name, pr.owner)
-    owner_teams = owner.get_teams()
-    non_isolated_team_members = []
-    for member in members_except_owner:
-        should_add = True
-        teams = member.get_teams()
-        for team in teams:
-            if team.team_type == 'isolated' and team not in owner_teams:
-                should_add = False
-        if should_add:
-            non_isolated_team_members.append(member)
-
-    team_members = sorted(non_isolated_team_members, key=lambda m: m.workload, reverse=True)
-
-    top_workloads = 2
-    if 2 < len(team_members) < 4:
-        top_workloads = 1
-    elif len(team_members) <= 2:
-        top_workloads = 0
-
-    if top_workloads <= 0:
-        return False
-
-    if team_members[top_workloads - 1].workload == team_members[top_workloads].workload:
-        # This member is not really very busy
-        top_workloads -= 1
-        if top_workloads > 0:
-            if team_members[top_workloads - 1].workload == team_members[top_workloads].workload:
-                # This member is not really very busy
-                top_workloads -= 1
-    if top_workloads <= 0:
-        return False
-
-    for member in team_members[:top_workloads]:
-        if member == reviewer:
-            return True
-    return False
-
-
-def is_reviewer_isolated(pr: PullRequest, reviewer: User) -> Tuple[Optional[Team], bool]:
-    reviewer_teams = reviewer.get_teams()
-    owner = User.get_from_db(pr.group_name, pr.owner)
-    owner_teams = owner.get_teams()
-    for team in reviewer_teams:
-        if team.team_type == 'isolated':
-            if team in owner_teams:
-                return team, False
-            return team, True
-    return None, False
-
-
 class PullRequestController:
     TITLE_FLAG = '-p '
     OWNER_FLAG = '-o '
@@ -152,11 +38,11 @@ class PullRequestController:
         response_info = ''
         if not pr.reviewer:
             reviewer_response = 'برای ریویوی اول کسی رو انتخاب نکردی.'
-        elif is_reviewer_busy(pr.pull_request, pr.reviewer):
+        elif cls.is_reviewer_busy(pr, pr.reviewer):
             reviewer_response = f'کاربر {pr.reviewer.telegram_id} یه کم سرش شلوغه. اگه درخواست رو قبول نکرد یکی دیگه ' \
                                 f'رو برای ریویو انتخاب کن.'
         else:
-            isolated_team, reviewer_isolated = is_reviewer_isolated(pr.pull_request, pr.reviewer)
+            isolated_team, reviewer_isolated = cls.is_reviewer_isolated(pr, pr.reviewer)
             if reviewer_isolated:
                 reviewer_response = f'کاربر {pr.reviewer.telegram_id} عضو تیم {isolated_team.name} عه و نمی‌تونه از ' \
                                     f'شما پی‌آر ببینه. اگه درخواست رو قبول نکرد یکی دیگه رو برای ریویو انتخاب کن.'
@@ -166,17 +52,17 @@ class PullRequestController:
 
         if not pr.assignee:
             assignee_response = 'برای ریویوی دوم کسی رو انتخاب نکردی.'
-        elif is_reviewer_busy(pr.pull_request, pr.assignee):
+        elif cls.is_reviewer_busy(pr, pr.assignee):
             assignee_response = f'کاربر {pr.assignee.telegram_id} یه کم سرش شلوغه. اگه درخواست رو قبول نکرد یکی دیگه ' \
                                 f'رو برای ریویو انتخاب کن.'
         else:
-            isolated_team, reviewer_isolated = is_reviewer_isolated(pr.pull_request, pr.assignee)
+            isolated_team, reviewer_isolated = cls.is_reviewer_isolated(pr, pr.assignee)
             if reviewer_isolated:
                 assignee_response = f'کاربر {pr.assignee.telegram_id} عضو تیم {isolated_team.name} عه و نمی‌تونه از ' \
                                     f'شما پی‌آر ببینه. اگه درخواست رو قبول نکرد یکی دیگه رو برای ریویو انتخاب کن.'
             else:
                 assignee_response = f'{pr.assignee.first_name} درخواست ریویوی دوم پی‌آر {pr.pull_request.title} از ' \
-                                    f'شما شده. ریویو می‌کنی؟ {pr.pull_request.reviewer}'
+                                    f'شما شده. ریویو می‌کنی؟ {pr.pull_request.assignee}'
 
         if (reviewer_response != 'برای ریویوی اول کسی رو انتخاب نکردی.'
                 or assignee_response != 'برای ریویوی دوم کسی رو انتخاب نکردی.'):
@@ -220,9 +106,9 @@ class PullRequestController:
                 raise Exception('نمی‌تونی خودت ریویوئر پول ریکوئست خودت باشی که!')
             assignee = User.get_from_db(group_name, pr_info['assignee']['value'])
         if pr_info['reviewer']['value'] == 'random':
-            reviewer = choose_random_reviewer(text, group_name, owner, assignee)
+            reviewer = cls.choose_random_reviewer(team, owner, assignee)
         if pr_info['assignee']['value'] == 'random':
-            assignee = choose_random_reviewer(text, group_name, owner, reviewer)
+            assignee = cls.choose_random_reviewer(team, owner, reviewer)
 
         added_changes = int(pr_info['changes']['value'].split()[0].strip())
         removed_changes = int(pr_info['changes']['value'].split()[1].strip())
@@ -330,3 +216,46 @@ class PullRequestController:
             if flags_dict[flag]['flag'] and flags_dict[flag]['necessary'] and not flags_dict[flag]['value']:
                 raise Exception(f'فلگ {flags_dict[flag]["flag"]} اجیاریه. لطفاً دوباره تلاش کن.')
         return flags_dict
+
+    @classmethod
+    def choose_random_reviewer(cls, team: Team, owner: User, other_reviewer: Optional[User]) -> User:
+        from sabpabot.controllers.get_team import TeamController
+
+        non_isolated_team_members = TeamController.get_non_isolated_members(team, owner)
+        free_members = TeamController.get_free_members(non_isolated_team_members)
+
+        if other_reviewer:
+            final_candids = [candid for candid in free_members if candid != other_reviewer]
+        else:
+            final_candids = free_members
+        print(f'final candids: ' + ', '.join(candid.full_name for candid in final_candids))
+
+        random_reviewer = random.choice(final_candids)
+        print(f'random reviewer is {random_reviewer.full_name}')
+        return random_reviewer
+
+    @classmethod
+    def is_reviewer_busy(cls, pr: PR, reviewer: User) -> bool:
+        from sabpabot.controllers.get_team import TeamController
+
+        non_isolated_team_members = TeamController.get_non_isolated_members(pr.team, pr.owner)
+        free_members = TeamController.get_free_members(non_isolated_team_members)
+        for member in free_members:
+            print(f'free member in {pr.team.name} is {member.first_name}')
+
+        return reviewer not in free_members and reviewer in non_isolated_team_members
+
+    @classmethod
+    def is_reviewer_isolated(cls, pr: PR, reviewer: User) -> Tuple[Optional[Team], bool]:
+        from sabpabot.controllers.get_team import TeamController
+
+        non_isolated_team_members = TeamController.get_non_isolated_members(pr.team, pr.owner)
+        if reviewer in non_isolated_team_members:
+            return None, False
+
+        reviewer_teams = reviewer.get_teams()
+        owner_teams = pr.owner.get_teams()
+        for team in reviewer_teams:
+            if team.team_type == 'isolated':
+                if team not in owner_teams:
+                    return team, True
