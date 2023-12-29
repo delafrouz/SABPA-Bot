@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from sabpabot.controllers.request_review import PullRequestController
+from sabpabot.controllers.pull_request_controller import PullRequestController
 
 
 async def review(update: Update, context: ContextTypes.DEFAULT_TYPE):

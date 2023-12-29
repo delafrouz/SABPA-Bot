@@ -1,5 +1,6 @@
 import dataclasses
 import random
+from decimal import Decimal
 
 from typing import Tuple, Optional
 
@@ -79,12 +80,90 @@ class PullRequestController:
         return f'{reviewer_response}\n\n{assignee_response}\n\n{response_info}'.strip()
 
     @classmethod
-    def get_accept_response(cls, text: str, group_name: str, owner_username: str) -> str:
-        pass
+    def get_accept_response(cls, accepter_username: str, group_name: str, text: str) -> str:
+        meaningful_text = text[text.find('-'):]
+        flags = ['-' + e for e in meaningful_text.split('-') if e]
+        title = ''
+        accepter_username = accepter_username if accepter_username.startswith('@') else f'@{accepter_username}'
+        accepter = User.get_from_db(group_name, accepter_username)
+
+        for flag in flags:
+            if flag.startswith('-p '):
+                if len(flag.split('-p ')) < 2:
+                    raise Exception('شماره‌ی پول‌ریکوئست رو درست وارد نکردی!')
+                title = flag.split('-p ')[1].strip()
+            else:
+                raise Exception('این پیغام رو بلد نبودم هندل کنم. برای راهنمایی دوباره /help رو ببین.')
+
+        pr = PullRequest.get_from_db(group_name, title)
+
+        if not pr:
+            raise Exception(f'پی‌آر با شماره‌ی {title} پیدا نکردم!')
+
+        if accepter.telegram_id == pr.reviewer:
+            if not pr.reviewer_confirmed:
+                pr.reviewer_confirmed = True
+                pr.update_in_db(group_name, title)
+                accepter.workload += pr.workload
+        if accepter.telegram_id == pr.assignee:
+            if not pr.assignee_confirmed:
+                pr.assignee_confirmed = True
+                pr.update_in_db(group_name, title)
+                if pr.assignee != pr.reviewer:
+                    accepter.workload += pr.workload
+        if not (accepter.telegram_id == pr.reviewer or accepter.telegram_id == pr.assignee):
+            raise Exception(f'شما ریویوئر پی‌آر با شماره‌ی {title} نیستی!')
+
+        accepter.update_in_db(group_name, accepter.telegram_id)
+
+        return f'کاربر {accepter.first_name} پی‌آر {pr.title} شما رو قبول کرد!! {pr.owner}'
+
 
     @classmethod
-    def get_finish_response(cls, text: str, group_name: str, owner_username: str) -> str:
-        pass
+    def get_finish_response(cls,finisher_username: str, group_name: str, text: str) -> str:
+        meaningful_text = text[text.find('-'):]
+        flags = ['-' + e for e in meaningful_text.split('-') if e]
+        title = ''
+        finisher_username = finisher_username if finisher_username.startswith('@') else f'@{finisher_username}'
+        finisher = User.get_from_db(group_name, finisher_username)
+
+        for flag in flags:
+            flag.strip()
+            if flag.startswith('-p '):
+                if len(flag.split('-p ')) < 2:
+                    raise Exception('شماره‌ی پول‌ریکوئست رو درست وارد نکردی!')
+                title = flag.split('-p ')[1].strip()
+            else:
+                raise Exception('این پیغام رو بلد نبودم هندل کنم. برای راهنمایی دوباره /help رو ببین.')
+        pr = PullRequest.get_from_db(group_name, title)
+
+        if not pr:
+            raise Exception(f'پی‌آر با شماره‌ی {title} پیدا نکردم!')
+
+        if finisher.telegram_id == pr.reviewer:
+            if not pr.review_finished:
+                pr.review_finished = True
+                pr.update_in_db(group_name, title)
+                finisher.workload = max(finisher.workload - pr.workload, Decimal('0'))
+                finisher.finished_reviews += 1
+        if finisher.telegram_id == pr.assignee:
+            if not pr.assign_finished:
+                pr.assign_finished = True
+                pr.update_in_db(group_name, title)
+                if pr.assignee != pr.reviewer:
+                    finisher.workload = max(finisher.workload - pr.workload, Decimal('0'))
+                    finisher.finished_reviews += 1
+        if not (finisher.telegram_id == pr.reviewer or finisher.telegram_id == pr.assignee):
+            raise Exception(f'شما ریویوئر پی‌آر با شماره‌ی {title} نیستی!')
+
+        finisher.update_in_db(group_name, finisher.telegram_id)
+
+        result = f'کاربر {finisher.first_name} پی‌آر {pr.title} شما رو تموم کرد!! {pr.owner}'
+
+        if finisher.finished_reviews % 5 == 0:
+            result += f'\nکاربر {finisher.first_name} کلی پی‌آر دیده! به افتخارش دست بزنین! 🎉👏'
+
+        return result
 
     @classmethod
     def _get_or_create_pull_request(cls, text: str, group_name: str, owner_username: str) -> PR:
@@ -219,7 +298,7 @@ class PullRequestController:
 
     @classmethod
     def choose_random_reviewer(cls, team: Team, owner: User, other_reviewer: Optional[User]) -> User:
-        from sabpabot.controllers.get_team import TeamController
+        from sabpabot.controllers.team_controller import TeamController
 
         non_isolated_team_members = TeamController.get_non_isolated_members(team, owner)
         free_members = TeamController.get_free_members(non_isolated_team_members)
@@ -236,18 +315,15 @@ class PullRequestController:
 
     @classmethod
     def is_reviewer_busy(cls, pr: PR, reviewer: User) -> bool:
-        from sabpabot.controllers.get_team import TeamController
+        from sabpabot.controllers.team_controller import TeamController
 
         non_isolated_team_members = TeamController.get_non_isolated_members(pr.team, pr.owner)
         free_members = TeamController.get_free_members(non_isolated_team_members)
-        for member in free_members:
-            print(f'free member in {pr.team.name} is {member.first_name}')
-
         return reviewer not in free_members and reviewer in non_isolated_team_members
 
     @classmethod
     def is_reviewer_isolated(cls, pr: PR, reviewer: User) -> Tuple[Optional[Team], bool]:
-        from sabpabot.controllers.get_team import TeamController
+        from sabpabot.controllers.team_controller import TeamController
 
         non_isolated_team_members = TeamController.get_non_isolated_members(pr.team, pr.owner)
         if reviewer in non_isolated_team_members:

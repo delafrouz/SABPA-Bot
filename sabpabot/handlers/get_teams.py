@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from sabpabot.controllers.get_team import TeamController
+from sabpabot.controllers.team_controller import TeamController
 
 
 async def get_teams(update: Update, context: ContextTypes.DEFAULT_TYPE):

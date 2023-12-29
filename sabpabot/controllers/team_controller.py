@@ -1,21 +1,34 @@
-from typing import List
+from decimal import Decimal
+from typing import List, Tuple
 
-from sabpabot.data_models.team import Team
+from sabpabot.data_models.team import Team, TEAM_GROUP_TYPES
 from sabpabot.data_models.user import User
 
 
 class TeamController:
     MEMBER_FLAG = '-m '
     TEAM_FLAG = '-t '
+    TEAM_NAME_FLAG = '-n '
+    TEAM_TYPE_FLAG = '-t '
 
     @classmethod
     def get_teams_response(cls, text: str, group_name: str):
-        team_info = cls._extract_team_flags(text, group_name)
+        team_info = cls._extract_get_team_flags(text, group_name)
         if team_info['team']['value']:
             return cls._get_one_team_info(team_info)
         if team_info['member']['value']:
             return cls._get_members_teams(team_info)
         return cls._get_all_teams_info(team_info)
+
+    @classmethod
+    def create_teams(cls, text: str, group_name: str) -> List[Tuple[Team, List[User]]]:
+        teams = text.split(';')
+        results = []
+        for team_info in teams:
+            team_info = team_info.strip()
+            if team_info:
+                results.append(cls.create_team_and_members(team_info.strip(), group_name))
+        return results
 
     @classmethod
     def _get_one_team_info(cls, team_info: dict) -> str:
@@ -41,7 +54,7 @@ class TeamController:
                 '\n- '.join(f'گروه {team.name} از نوع {team.team_type}' for team in teams))
 
     @classmethod
-    def _extract_team_flags(cls, text: str, group_name: str) -> dict:
+    def _extract_get_team_flags(cls, text: str, group_name: str) -> dict:
         flags_dict = {
             'team': {
                 'value': '',
@@ -76,6 +89,101 @@ class TeamController:
 
         if flags_dict['team']['value'] and flags_dict['member']['value']:
             raise Exception('هر دو فلگ تیم و عضو رو نمی‌تونی با هم استفاده کنی. حداکثر فقط یکیش رو بزن')
+        return flags_dict
+
+    @classmethod
+    def create_team_and_members(cls, team_info: str, group_name: str) -> Tuple[Team, List[User]]:
+        """
+        Create a team and members from the given team_info.
+        """
+        team_infos = cls._extract_create_team_flags(team_info, group_name)
+        member_infos = team_infos['members']['value'].split()
+        members = []
+        idx = 0
+        while idx < len(member_infos):
+            member_id = member_infos[idx]
+
+            if not member_id.startswith('@'):
+                raise Exception('اطلاعات هر کاربر باید با آی‌دی تلگرامش شروع بشه!')
+            if idx + 1 >= len(member_infos):
+                raise Exception(f'اسم کاربر {member_id} رو وارد نکردی!')
+            if member_infos[idx + 1].startswith('@'):
+                raise Exception(f'اسم کاربر {member_id} رو وارد نکردی!')
+            first_name = member_infos[idx + 1]
+            last_name = member_infos[idx + 2] if idx + 2 < len(member_infos) else ''
+            if last_name.startswith('@'):
+                last_name = ''
+            user = User.get_or_create(group_name=group_name,
+                                      first_name=first_name,
+                                      last_name=last_name,
+                                      telegram_id=member_id,
+                                      workload=Decimal(0))
+            members.append(user)
+            idx += (3 if last_name else 2)
+
+        if team_infos['type']['value'] and team_infos['type']['value'] not in TEAM_GROUP_TYPES:
+            raise Exception(f'تایپ تیم باید جز {TEAM_GROUP_TYPES} باشه')
+
+        team = Team(name=team_infos['team']['value'],
+                    group_name=team_infos['group']['value'],
+                    team_type=team_infos['type']['value'])
+        team.set_in_db()
+        for member in members:
+            member.add_team(team)
+        return team, members
+
+    @classmethod
+    def _extract_create_team_flags(cls, team_info: str, group_name: str) -> dict:
+        flags_dict = {
+            'team': {
+                'value': '',
+                'flag': cls.TEAM_NAME_FLAG,
+                'necessary': True
+            },
+            'members': {
+                'value': '',
+                'flag': cls.MEMBER_FLAG,
+                'necessary': True
+            },
+            'type': {
+                'value': '',
+                'flag': cls.TEAM_TYPE_FLAG,
+                'necessary': False
+            },
+            'group': {
+                'value': '',
+                'flag': None,
+                'necessary': False
+            },
+        }
+        flags_dict['group']['value'] = group_name
+        meaningful_text = team_info[team_info.find('-'):]
+        flags = ['-' + e for e in meaningful_text.split('-') if e]
+        for flag in flags:
+            flag = flag.strip()
+            if not flag:
+                continue
+
+            if flag.startswith('-n '):
+                if len(flag.split('-n ')) < 2:
+                    raise Exception('اسم تیم رو درست وارد نکردی!')
+                flags_dict['team']['value'] = flag.split('-n ')[1].strip()
+
+            elif flag.startswith('-t '):
+                if len(flag.split('-t ')) < 2:
+                    raise Exception('تایپ تیم رو درست وارد نکردی!')
+                flags_dict['type']['value'] = flag.split('-t ')[1].strip()
+
+            elif flag.startswith('-m '):
+                if len(flag.split('-m ')) < 2:
+                    raise Exception('مشخصات اعضا رو درست وارد نکردی!')
+                flags_dict['members']['value'] = flag.split('-m ')[1].strip()
+            else:
+                raise Exception('این پیغام رو بلد نبودم هندل کنم. برای راهنمایی دوباره /help رو ببین.')
+
+        for flag in flags_dict:
+            if flags_dict[flag]['flag'] and flags_dict[flag]['necessary'] and not flags_dict[flag]['value']:
+                raise Exception(f'فلگ {flags_dict[flag]["flag"]} اجیاریه. لطفاً دوباره تلاش کن.')
         return flags_dict
 
     @classmethod

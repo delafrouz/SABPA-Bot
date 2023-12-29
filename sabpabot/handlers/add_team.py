@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from sabpabot.controllers.add_team import create_teams
+from sabpabot.controllers.team_controller import TeamController
 
 
 async def add_team(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -11,7 +11,7 @@ async def add_team(update: Update, context: ContextTypes.DEFAULT_TYPE):
     group_name = update.message.chat.title or update.message.from_user.username
     print(f'group name is {group_name}')
     try:
-        results = create_teams(text, group_name)
+        results = TeamController.create_teams(text, group_name)
         message_reply = ''
         for (team, members) in results:
             message_reply += (f'تیم {team.name} با این اعضا ساخته شد: ' +
