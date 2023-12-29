@@ -2,7 +2,7 @@ from sabpabot.handlers.accept_review import accept
 from sabpabot.handlers.add_team import add_team
 from sabpabot.handlers.finish_review import finish
 from sabpabot.handlers.get_pull_requests import prs
-from sabpabot.handlers.get_teams import get_teams, get_team
+from sabpabot.handlers.get_teams import get_teams
 from sabpabot.handlers.get_users import users
 from sabpabot.handlers.help import get_help
 from sabpabot.handlers.request_review import review
@@ -29,19 +29,15 @@ HANDLERS = [
                         'name_does_not_matter_now @member3 new_user_first_name',
     },
     {
-        'command_name': 'team',
-        'handler_method': get_team,
-        'description': "Get a team's information",
-        'help_text': 'برای گرفتن اطلاعات یه تیم می‌تونی از این دستور استفاده کنی. در این دستور فلگ -t اسم گروه رو '
-                     'مشخص می‌کنه و اجباریه.',
-        'usage_sample': '/team@SabpaBot -t group_name',
-    },
-    {
         'command_name': 'teams',
         'handler_method': get_teams,
         'description': 'Get the list of all teams and their info',
-        'help_text': 'برای گرفتن لیست تیم های گروه از این دستور استفاده کن. فلگی هم لازم نداره',
-        'usage_sample': '/teams@SabpaBot',
+        'help_text': 'برای گرفتن لیست تیم های گروه از این دستور استفاده کن. در صورتی که این کامند رو بدون هیچ فلگی '
+                     'استفاده کنی، لیست تمام تیم‌های گروه رو میده. اگر با فلگ -t استفاده کنی، باید اسم یک تیم رو در '
+                     'ادامه وارد کنی تا مشخصات و اعضای اون تیم رو ببینی. اگر از فلگ -m استفاده کنی، باید آی‌دی یک '
+                     'کاربر رو در ادامه وارد کنی تا تیم‌هایی که این کاربر عضوشه رو ببینی. هم‌زمان نمی‌تونی از هر دو '
+                     'فلگ -t و -m استفاده کنی.',
+        'usage_sample': '/teams@SabpaBot or /teams@SabpaBot -t team_name or /teams@SabpaBot -m @member',
     },
     {
         'command_name': 'review',

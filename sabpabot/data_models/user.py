@@ -108,7 +108,7 @@ class User:
         return self.__hash__() == other.__hash__() and self.telegram_id == other.telegram_id
 
     def __str__(self):
-        return f'کاربر {self.full_name} با آی‌دی {self.telegram_id} و حجم کار {self.workload}'
+        return f'کاربر {self.full_name} با آی‌دی {self.telegram_id} و حجم کار {f"{self.workload:.{3}f}"}'
 
     @classmethod
     def get_all_users(cls, group_name: str) -> Union[List['User'], None]:

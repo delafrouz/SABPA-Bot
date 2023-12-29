@@ -4,17 +4,80 @@ from sabpabot.data_models.team import Team
 from sabpabot.data_models.user import User
 
 
-def get_team_by_name(text: str, group_name: str) -> str:
-    if not '-t ' in text:
-        raise Exception('اسم تیم رو وارد نکردی.')
-    text = text[text.find('-n ') + 3:].strip()
-    if len(text) <= 0:
-        raise Exception('اسم تیم رو وارد نکردی.')
-    team = Team.get_from_db(group_name, text)
-    return team.__str__()
-
-
 class TeamController:
+    MEMBER_FLAG = '-m '
+    TEAM_FLAG = '-t '
+
+    @classmethod
+    def get_teams_response(cls, text: str, group_name: str):
+        team_info = cls._extract_team_flags(text, group_name)
+        if team_info['team']['value']:
+            return cls._get_one_team_info(team_info)
+        if team_info['member']['value']:
+            return cls._get_members_teams(team_info)
+        return cls._get_all_teams_info(team_info)
+
+    @classmethod
+    def _get_one_team_info(cls, team_info: dict) -> str:
+        team = Team.get_from_db(team_info['group']['value'], team_info['team']['value'])
+        members = team.get_members()
+        response = team.__str__() + '، اعضا:\n- ' + '\n- '.join(member.__str__() for member in members)
+        return response
+
+    @classmethod
+    def _get_members_teams(cls, team_info: dict) -> str:
+        member = User.get_from_db(team_info['group']['value'], team_info['member']['value'])
+        teams = member.get_teams()
+        response = f'تیم‌های کاربر {member.first_name}: ' + '، '.join(team.__str__() for team in teams)
+        return response
+
+    @classmethod
+    def _get_all_teams_info(cls, team_info: dict) -> str:
+        teams = Team.get_all_teams(team_info['group']['value'])
+        if not teams:
+            return 'در حال حاضر هیچ تیمی ساخته نشده است.'
+        return(
+                'لیست تیم‌های گروه شما موجود در سامانه‌ی برنامه ریزی پی‌آر:\n- ' +
+                '\n- '.join(f'گروه {team.name} از نوع {team.team_type}' for team in teams))
+
+    @classmethod
+    def _extract_team_flags(cls, text: str, group_name: str) -> dict:
+        flags_dict = {
+            'team': {
+                'value': '',
+                'flag': cls.TEAM_FLAG,
+            },
+            'member': {
+                'value': '',
+                'flag': cls.MEMBER_FLAG,
+            },
+            'group': {
+                'value': '',
+                'flag': None,
+            },
+        }
+        flags_dict['group']['value'] = group_name
+        if not text:
+            return flags_dict
+        flags = ['-' + e for e in text.split('-') if e]
+
+        for flag in flags:
+            if flag.startswith('-t '):
+                if len(flag.split('-t ')) < 2:
+                    raise Exception('اسم تیم رو درست وارد نکردی!')
+                flags_dict['team']['value'] = flag.split('-t ')[1].strip()
+
+            elif flag.startswith('-m '):
+                if len(flag.split('-m ')) < 2:
+                    raise Exception('آی‌دی عضو رو درست مشخص نکردی!')
+                flags_dict['member']['value'] = flag.split('-m ')[1].strip()
+            else:
+                raise Exception('این پیغام رو بلد نبودم هندل کنم. برای راهنمایی دوباره /help رو ببین.')
+
+        if flags_dict['team']['value'] and flags_dict['member']['value']:
+            raise Exception('هر دو فلگ تیم و عضو رو نمی‌تونی با هم استفاده کنی. حداکثر فقط یکیش رو بزن')
+        return flags_dict
+
     @classmethod
     def get_non_isolated_members(cls, team: Team, reference_user: User) -> List[User]:
         """
