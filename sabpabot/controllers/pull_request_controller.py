@@ -30,10 +30,10 @@ class PullRequestController:
     @classmethod
     def get_review_response(cls, text: str, group_name: str, owner_username: str) -> str:
         owner_username = owner_username if owner_username.startswith('@') else '@' + owner_username
-        pr = cls._get_or_create_pull_request(text=text, group_name=group_name, owner_username=owner_username)
+        pr, created = cls._get_or_create_pull_request(text=text, group_name=group_name, owner_username=owner_username)
 
-        if owner_username != pr.owner.telegram_id:
-            raise Exception('شما اجازه‌ی دسترسی به این پی‌آر رو نداری')
+        if not created:
+            return f'تغییرات به صورت زیر اعمال شد:\n{str(pr.pull_request)}'
 
         reviewer_response = ''
         assignee_response = ''
@@ -81,133 +81,19 @@ class PullRequestController:
         return f'{reviewer_response}\n\n{assignee_response}\n\n{response_info}'.strip()
 
     @classmethod
-    def get_accept_response(cls, accepter_username: str, group_name: str, text: str) -> str:
-        meaningful_text = text[text.find('-'):]
-        flags = ['-' + e for e in meaningful_text.split('-') if e]
-        title = ''
-        accepter_username = accepter_username if accepter_username.startswith('@') else f'@{accepter_username}'
-        accepter = User.get_from_db(group_name, accepter_username)
-
-        for flag in flags:
-            if flag.startswith('-p '):
-                if len(flag.split('-p ')) < 2:
-                    raise Exception('شماره‌ی پول‌ریکوئست رو درست وارد نکردی!')
-                title = flag.split('-p ')[1].strip()
-            else:
-                raise Exception('این پیغام رو بلد نبودم هندل کنم. برای راهنمایی دوباره /help رو ببین.')
-
-        pr = PullRequest.get_from_db(group_name, title)
-
-        if not pr:
-            raise Exception(f'پی‌آر با شماره‌ی {title} پیدا نکردم!')
-
-        if accepter.telegram_id == pr.reviewer:
-            if not pr.reviewer_confirmed:
-                pr.reviewer_confirmed = True
-                pr.update_in_db(group_name, title)
-                accepter.workload += pr.workload
-        if accepter.telegram_id == pr.assignee:
-            if not pr.assignee_confirmed:
-                pr.assignee_confirmed = True
-                pr.update_in_db(group_name, title)
-                if pr.assignee != pr.reviewer:
-                    accepter.workload += pr.workload
-        if not (accepter.telegram_id == pr.reviewer or accepter.telegram_id == pr.assignee):
-            raise Exception(f'شما ریویوئر پی‌آر با شماره‌ی {title} نیستی!')
-
-        accepter.update_in_db(group_name, accepter.telegram_id)
-
-        return f'کاربر {accepter.first_name} پی‌آر {pr.title} شما رو قبول کرد!! {pr.owner}'
-
-    @classmethod
-    def get_finish_response(cls,finisher_username: str, group_name: str, text: str) -> str:
-        meaningful_text = text[text.find('-'):]
-        flags = ['-' + e for e in meaningful_text.split('-') if e]
-        title = ''
-        finisher_username = finisher_username if finisher_username.startswith('@') else f'@{finisher_username}'
-        finisher = User.get_from_db(group_name, finisher_username)
-
-        for flag in flags:
-            flag.strip()
-            if flag.startswith('-p '):
-                if len(flag.split('-p ')) < 2:
-                    raise Exception('شماره‌ی پول‌ریکوئست رو درست وارد نکردی!')
-                title = flag.split('-p ')[1].strip()
-            else:
-                raise Exception('این پیغام رو بلد نبودم هندل کنم. برای راهنمایی دوباره /help رو ببین.')
-        pr = PullRequest.get_from_db(group_name, title)
-
-        if not pr:
-            raise Exception(f'پی‌آر با شماره‌ی {title} پیدا نکردم!')
-
-        if finisher.telegram_id == pr.reviewer:
-            if not pr.review_finished:
-                pr.review_finished = True
-                pr.update_in_db(group_name, title)
-                finisher.workload = max(finisher.workload - pr.workload, Decimal('0'))
-                finisher.finished_reviews += 1
-        if finisher.telegram_id == pr.assignee:
-            if not pr.assign_finished:
-                pr.assign_finished = True
-                pr.update_in_db(group_name, title)
-                if pr.assignee != pr.reviewer:
-                    finisher.workload = max(finisher.workload - pr.workload, Decimal('0'))
-                    finisher.finished_reviews += 1
-        if not (finisher.telegram_id == pr.reviewer or finisher.telegram_id == pr.assignee):
-            raise Exception(f'شما ریویوئر پی‌آر با شماره‌ی {title} نیستی!')
-
-        finisher.update_in_db(group_name, finisher.telegram_id)
-
-        result = f'کاربر {finisher.first_name} پی‌آر {pr.title} شما رو تموم کرد!! {pr.owner}'
-
-        if finisher.finished_reviews % 5 == 0:
-            result += f'\nکاربر {finisher.first_name} کلی پی‌آر دیده! به افتخارش دست بزنین! 🎉👏'
-
-        return result
-
-    @classmethod
-    def _get_or_create_pull_request(cls, text: str, group_name: str, owner_username: str) -> PR:
+    def _get_or_create_pull_request(cls, text: str, group_name: str, owner_username: str) -> Tuple[PR, bool]:
         pr_info = cls._extract_review_flags(text, group_name, owner_username)
+        created = False
+        try:
+            pr = PullRequest.get_from_db(group_name, pr_info['title']['value'])
+        except Exception:
+            created = True
+        if created:
+            pr = cls._create_pull_request(group_name, pr_info)
+        else:
+            pr = cls._update_pull_request(pr, pr_info)
+        return pr, created
 
-        owner = User.get_from_db(group_name, pr_info['owner']['value'])
-
-        team = Team.get_from_db(group_name, pr_info['team']['value'])
-        if not team:
-            raise Exception('تیم پول‌ریکوئست رو درست وارد نکردی!')
-
-        reviewer, assignee = None, None
-        if pr_info['reviewer']['value'] != 'random':
-            if pr_info['reviewer']['value'] == pr_info['owner']['value']:
-                raise Exception('نمی‌تونی خودت ریویوئر پول ریکوئست خودت باشی که!')
-            reviewer = User.get_from_db(group_name, pr_info['reviewer']['value'])
-        if pr_info['assignee']['value'] != 'random':
-            if pr_info['assignee']['value'] == pr_info['owner']['value']:
-                raise Exception('نمی‌تونی خودت ریویوئر پول ریکوئست خودت باشی که!')
-            assignee = User.get_from_db(group_name, pr_info['assignee']['value'])
-        if pr_info['reviewer']['value'] == 'random':
-            reviewer = cls.choose_random_reviewer(team, owner, assignee)
-        if pr_info['assignee']['value'] == 'random':
-            assignee = cls.choose_random_reviewer(team, owner, reviewer)
-
-        added_changes = int(pr_info['changes']['value'].split()[0].strip())
-        removed_changes = int(pr_info['changes']['value'].split()[1].strip())
-        if added_changes < 0 or removed_changes < 0:
-            raise Exception('تعداد خطوط تغییرات نمی‌تونه منفی باشه!')
-
-        if pr_info['status']['value'] and pr_info['status']['value'] not in PR_URGENCY:
-            raise Exception(f'استتوس پول ریکوئست باید جز {PR_URGENCY} باشه')
-        urgency = pr_info['status']['value'] if pr_info['status']['value'] else 'normal'
-
-        pr = PullRequest.get_or_create(owner=owner.telegram_id,
-                                       title=pr_info['title']['value'],
-                                       group_name=group_name,
-                                       team=team.name,
-                                       urgency=urgency,
-                                       reviewer=reviewer.telegram_id,
-                                       assignee=assignee.telegram_id,
-                                       added_changes=added_changes,
-                                       removed_changes=removed_changes)
-        return cls.PR(pull_request=pr, team=team, owner=owner, reviewer=reviewer, assignee=assignee)
 
     @classmethod
     def _extract_review_flags(cls, text: str, group_name: str, owner_username: str) -> dict:
@@ -215,7 +101,7 @@ class PullRequestController:
             'team': {
                 'value': '',
                 'flag': cls.TEAM_FLAG,
-                'necessary': True
+                'necessary': False
             },
             'title': {
                 'value': '',
@@ -235,17 +121,17 @@ class PullRequestController:
             'reviewer': {
                 'value': '',
                 'flag': cls.REVIEWER_FLAG,
-                'necessary': True
+                'necessary': False
             },
             'assignee': {
                 'value': '',
                 'flag': cls.ASSIGNEE_FLAG,
-                'necessary': True
+                'necessary': False
             },
             'changes': {
                 'value': '',
                 'flag': cls.CHANGE_FLAG,
-                'necessary': True
+                'necessary': False
             },
             'status': {
                 'value': '',
@@ -298,6 +184,111 @@ class PullRequestController:
         return flags_dict
 
     @classmethod
+    def _update_pull_request(cls, pr: PullRequest, pr_info: dict) -> PR:
+        # Cannot change the team, group, title, owner, changes, status for now. Might change some in the future
+        if pr_info['owner']['value'] != pr.owner:
+            raise Exception('شما اجازه‌ی دسترسی به این پی‌آر رو نداری')
+
+        reviewer, assignee = None, None
+        if pr.reviewer:
+            reviewer = User.get_from_db(pr.group_name, pr.reviewer)
+        else:
+            pr_info['reviewer']['necessary'] = True
+        if pr.assignee:
+            assignee = User.get_from_db(pr.group_name, pr.assignee)
+        else:
+            pr_info['assignee']['necessary'] = True
+        for flag in pr_info:
+            if pr_info[flag]['flag'] and pr_info[flag]['necessary'] and not pr_info[flag]['value']:
+                raise Exception(f'فلگ {pr_info[flag]["flag"]} اجیاریه. لطفاً دوباره تلاش کن.')
+
+        full_pr = cls.find_reviewer(
+            pr=pr, pr_info=pr_info, current_reviewer=reviewer, proposed_reviewer=pr_info['reviewer']['value'],
+            current_assignee=assignee, proposed_assignee=['assignee']['value']
+        )
+
+        _, is_reviewer_isolated = cls.is_reviewer_isolated(full_pr, full_pr.reviewer)
+        _, is_assignee_isolated = cls.is_reviewer_isolated(full_pr, full_pr.assignee)
+
+        pr.reviewer = full_pr.reviewer.telegram_id
+        pr.assignee = full_pr.assignee.telegram_id
+        pr.reviewer_confirmed = True
+        pr.assignee_confirmed = True
+        pr.can_reviewer_reject = is_reviewer_isolated or cls.is_reviewer_busy(full_pr, reviewer)
+        pr.can_assignee_reject = is_assignee_isolated or cls.is_reviewer_busy(full_pr, assignee)
+        pr.update_in_db(pr.group_name, pr.title)
+        return cls.PR(
+            pull_request=pr, team=full_pr.team, owner=full_pr.owner, reviewer=full_pr.reviewer,
+            assignee=full_pr.assignee
+        )
+
+    @classmethod
+    def _create_pull_request(cls, group_name: str, pr_info: dict) -> PR:
+        pr_info['team']['necessary'] = True
+        pr_info['reviewer']['necessary'] = True
+        pr_info['assignee']['necessary'] = True
+        pr_info['changes']['necessary'] = True
+        for flag in pr_info:
+            if pr_info[flag]['flag'] and pr_info[flag]['necessary'] and not pr_info[flag]['value']:
+                raise Exception(f'فلگ {pr_info[flag]["flag"]} اجیاریه. لطفاً دوباره تلاش کن.')
+
+        full_pr = cls.find_reviewer(
+            pr=None, pr_info=pr_info, current_reviewer=None, proposed_reviewer=pr_info['reviewer']['value'],
+            current_assignee=None, proposed_assignee=pr_info['assignee']['value']
+        )
+
+        added_changes = int(pr_info['changes']['value'].split()[0].strip())
+        removed_changes = int(pr_info['changes']['value'].split()[1].strip())
+        if added_changes < 0 or removed_changes < 0:
+            raise Exception('تعداد خطوط تغییرات نمی‌تونه منفی باشه!')
+
+        if pr_info['status']['value'] and pr_info['status']['value'] not in PR_URGENCY:
+            raise Exception(f'استتوس پول ریکوئست باید جز {PR_URGENCY} باشه')
+        urgency = pr_info['status']['value'] if pr_info['status']['value'] else 'normal'
+
+        _, is_reviewer_isolated = cls.is_reviewer_isolated(full_pr, full_pr.reviewer)
+        _, is_assignee_isolated = cls.is_reviewer_isolated(full_pr, full_pr.assignee)
+
+        pr = PullRequest(
+            owner=full_pr.owner.telegram_id, title=pr_info['title']['value'], group_name=group_name,
+            team=full_pr.team.name, urgency=urgency,
+            reviewer=full_pr.reviewer.telegram_id, assignee=full_pr.assignee.telegram_id,
+            reviewer_confirmed=True, assignee_confirmed=True,
+            can_reviewer_reject=is_reviewer_isolated or cls.is_reviewer_busy(full_pr, full_pr.reviewer),
+            can_assignee_reject=is_assignee_isolated or cls.is_reviewer_busy(full_pr, full_pr.assignee),
+            added_changes=added_changes, removed_changes=removed_changes
+        )
+        pr.set_in_db()
+        return cls.PR(pull_request=pr, team=full_pr.team, owner=full_pr.owner, reviewer=full_pr.reviewer, assignee=full_pr.assignee)
+
+    @classmethod
+    def find_reviewer(cls, pr: Optional[PullRequest], pr_info: dict,
+                      current_reviewer: Optional[User], proposed_reviewer: Optional[str],
+                      current_assignee: Optional[User], proposed_assignee: Optional[str]) -> PR:
+        if pr:
+            owner = User.get_from_db(pr.group_name, pr.owner)
+            team = Team.get_from_db(pr.group_name, pr.team)
+        else:
+            owner = User.get_from_db(pr_info['group']['value'], pr_info['owner']['value'])
+            team = Team.get_from_db(pr_info['group']['value'], pr_info['team']['value'])
+        if not team:
+            raise Exception('تیم پول‌ریکوئست رو درست وارد نکردی!')
+
+        if proposed_reviewer and proposed_reviewer != 'random':
+            if proposed_reviewer == pr_info['owner']['value']:
+                raise Exception('نمی‌تونی خودت ریویوئر پول ریکوئست خودت باشی که!')
+            current_reviewer = User.get_from_db(pr_info['group']['value'], proposed_reviewer)
+        if proposed_assignee and proposed_assignee != 'random':
+            if proposed_assignee == pr_info['owner']['value']:
+                raise Exception('نمی‌تونی خودت ریویوئر پول ریکوئست خودت باشی که!')
+            current_assignee = User.get_from_db(pr_info['group']['value'], proposed_assignee)
+        if proposed_reviewer == 'random':
+            current_reviewer = cls.choose_random_reviewer(team, owner, current_assignee)
+        if proposed_assignee == 'random':
+            current_assignee = cls.choose_random_reviewer(team, owner, current_reviewer)
+        return cls.PR(pull_request=pr, team=team, owner=owner, reviewer=current_reviewer, assignee=current_assignee)
+
+    @classmethod
     def choose_random_reviewer(cls, team: Team, owner: User, other_reviewer: Optional[User]) -> User:
         from sabpabot.controllers.team_controller import TeamController
 
@@ -339,6 +330,91 @@ class PullRequestController:
                     return team, True
 
     @classmethod
+    def get_accept_response(cls, accepter_username: str, group_name: str, text: str) -> str:
+        meaningful_text = text[text.find('-'):]
+        flags = ['-' + e for e in meaningful_text.split('-') if e]
+        title = ''
+        accepter_username = accepter_username if accepter_username.startswith('@') else f'@{accepter_username}'
+        accepter = User.get_from_db(group_name, accepter_username)
+
+        for flag in flags:
+            if flag.startswith('-p '):
+                if len(flag.split('-p ')) < 2:
+                    raise Exception('شماره‌ی پول‌ریکوئست رو درست وارد نکردی!')
+                title = flag.split('-p ')[1].strip()
+            else:
+                raise Exception('این پیغام رو بلد نبودم هندل کنم. برای راهنمایی دوباره /help رو ببین.')
+
+        pr = PullRequest.get_from_db(group_name, title)
+
+        if not pr:
+            raise Exception(f'پی‌آر با شماره‌ی {title} پیدا نکردم!')
+
+        if accepter.telegram_id == pr.reviewer:
+            if not pr.reviewer_confirmed:
+                pr.reviewer_confirmed = True
+                pr.update_in_db(group_name, title)
+                accepter.workload += pr.workload
+        if accepter.telegram_id == pr.assignee:
+            if not pr.assignee_confirmed:
+                pr.assignee_confirmed = True
+                pr.update_in_db(group_name, title)
+                if pr.assignee != pr.reviewer:
+                    accepter.workload += pr.workload
+        if not (accepter.telegram_id == pr.reviewer or accepter.telegram_id == pr.assignee):
+            raise Exception(f'شما ریویوئر پی‌آر با شماره‌ی {title} نیستی!')
+
+        accepter.update_in_db(group_name, accepter.telegram_id)
+
+        return f'کاربر {accepter.first_name} پی‌آر {pr.title} شما رو قبول کرد!! {pr.owner}'
+
+    @classmethod
+    def get_finish_response(cls, finisher_username: str, group_name: str, text: str) -> str:
+        meaningful_text = text[text.find('-'):]
+        flags = ['-' + e for e in meaningful_text.split('-') if e]
+        title = ''
+        finisher_username = finisher_username if finisher_username.startswith('@') else f'@{finisher_username}'
+        finisher = User.get_from_db(group_name, finisher_username)
+
+        for flag in flags:
+            flag.strip()
+            if flag.startswith('-p '):
+                if len(flag.split('-p ')) < 2:
+                    raise Exception('شماره‌ی پول‌ریکوئست رو درست وارد نکردی!')
+                title = flag.split('-p ')[1].strip()
+            else:
+                raise Exception('این پیغام رو بلد نبودم هندل کنم. برای راهنمایی دوباره /help رو ببین.')
+        pr = PullRequest.get_from_db(group_name, title)
+
+        if not pr:
+            raise Exception(f'پی‌آر با شماره‌ی {title} پیدا نکردم!')
+
+        if finisher.telegram_id == pr.reviewer:
+            if not pr.review_finished:
+                pr.review_finished = True
+                pr.update_in_db(group_name, title)
+                finisher.workload = max(finisher.workload - pr.workload, Decimal('0'))
+                finisher.finished_reviews += 1
+        if finisher.telegram_id == pr.assignee:
+            if not pr.assign_finished:
+                pr.assign_finished = True
+                pr.update_in_db(group_name, title)
+                if pr.assignee != pr.reviewer:
+                    finisher.workload = max(finisher.workload - pr.workload, Decimal('0'))
+                    finisher.finished_reviews += 1
+        if not (finisher.telegram_id == pr.reviewer or finisher.telegram_id == pr.assignee):
+            raise Exception(f'شما ریویوئر پی‌آر با شماره‌ی {title} نیستی!')
+
+        finisher.update_in_db(group_name, finisher.telegram_id)
+
+        result = f'کاربر {finisher.first_name} پی‌آر {pr.title} شما رو تموم کرد!! {pr.owner}'
+
+        if finisher.finished_reviews % 5 == 0:
+            result += f'\nکاربر {finisher.first_name} کلی پی‌آر دیده! به افتخارش دست بزنین! 🎉👏'
+
+        return result
+
+    @classmethod
     def get_prs(cls, text: str, group_name: str, sender_username: str) -> str:
         prs_info = cls._extract_get_prs_flags(text, group_name, sender_username)
         prs = PullRequest.get_all_prs(prs_info)
@@ -346,10 +422,7 @@ class PullRequestController:
             return 'پی‌آری با این مشخصات در گروه شما پیدا نشد.'
         return (
                 'لیست پی‌آرهای مد نظر شما موجود در سامانه‌ی برنامه ریزی پی‌آر:\n- ' +
-                '\n- '.join(
-                    f'پی‌آر {pr.title} با تغییرات +{pr.added_changes}/-{pr.removed_changes} از {pr.owner[1:]} با'
-                    f' ریویوئر اول {pr.reviewer[1:]} و ریویوئر دوم {pr.assignee[1:]} و وضعیت {pr.status} '
-                    f'از جنس {pr.urgency}' for pr in prs)
+                '\n- '.join(str(pr) for pr in prs)
         )
 
     @classmethod
@@ -430,4 +503,3 @@ class PullRequestController:
                 raise Exception('این پیغام رو بلد نبودم هندل کنم. برای راهنمایی دوباره /help رو ببین.')
 
         return flags_dict
-

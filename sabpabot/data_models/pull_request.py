@@ -13,6 +13,7 @@ class PullRequest:
 
     def __init__(self, owner: str, title: str, group_name: str, team: str = '', reviewer: str = '',
                  assignee: str = '', reviewer_confirmed: bool = False, assignee_confirmed: bool = False,
+                 can_reviewer_reject: bool = False, can_assignee_reject: bool = False,
                  review_finished: bool = False, assign_finished: bool = False, urgency: str = 'normal',
                  added_changes: int = 0, removed_changes: int = 0):
         self.owner: str = owner
@@ -23,6 +24,8 @@ class PullRequest:
         self.assignee: str = assignee
         self.reviewer_confirmed: bool = reviewer_confirmed
         self.assignee_confirmed: bool = assignee_confirmed
+        self.can_reviewer_reject: bool = can_reviewer_reject
+        self.can_assignee_reject: bool = can_assignee_reject
         self.review_finished: bool = review_finished
         self.assign_finished: bool = assign_finished
         self.urgency: str = urgency
@@ -55,6 +58,8 @@ class PullRequest:
             'assignee': self.assignee if self.assignee else '',
             'reviewer_confirmed': self.reviewer_confirmed,
             'assignee_confirmed': self.assignee_confirmed,
+            'can_reviewer_reject': self.can_reviewer_reject,
+            'can_assignee_reject': self.can_assignee_reject,
             'review_finished': self.review_finished,
             'assign_finished': self.assign_finished,
             'urgency': self.urgency,
@@ -72,6 +77,8 @@ class PullRequest:
         assignee = info.get('assignee', '')
         reviewer_confirmed = info.get('reviewer_confirmed', False)
         assignee_confirmed = info.get('assignee_confirmed', False)
+        can_reviewer_reject = info.get('can_reviewer_reject', False)
+        can_assignee_reject = info.get('can_assignee_reject', False)
         review_finished = info.get('review_finished', False)
         assign_finished = info.get('assign_finished', False)
         urgency = info.get('urgency', 'normal')
@@ -80,6 +87,7 @@ class PullRequest:
         return PullRequest(owner=owner, title=title, group_name=group_name, team=team, reviewer=reviewer,
                            assignee=assignee, reviewer_confirmed=reviewer_confirmed,
                            assignee_confirmed=assignee_confirmed, review_finished=review_finished,
+                           can_reviewer_reject=can_reviewer_reject, can_assignee_reject=can_assignee_reject,
                            assign_finished=assign_finished, urgency=urgency, added_changes=added_changes,
                            removed_changes=removed_changes)
 
@@ -88,9 +96,9 @@ class PullRequest:
         try:
             pr_info = \
                 mongo_db[cls.PR_COLLECTION].find_one({'group_name': group_name, 'title': title})
-            pr = PullRequest.from_json(pr_info)
-            if not pr:
+            if not pr_info:
                 raise Exception(f'نتونستم پول ریکوئست {title} رو پیدا کنم! :(')
+            pr = PullRequest.from_json(pr_info)
         except Exception as e:
             raise Exception(f'نتونستم پول ریکوئست {title} رو پیدا کنم! :(')
         return pr
@@ -100,27 +108,6 @@ class PullRequest:
             mongo_db[self.PR_COLLECTION].insert_one(self.to_json())
         except Exception as e:
             raise Exception(f'نتونستم پول ریکوئست {self.title} رو بریزم توی دیتابیس! :(')
-
-    @classmethod
-    def get_or_create(cls, owner: str, title: str, group_name: str, team: str,
-                      urgency: str, reviewer: str, assignee: str,
-                      added_changes: int, removed_changes: int) -> 'PullRequest':
-        try:
-            pr = cls.get_from_db(group_name, title)
-            if pr:
-                pr.team = team if team else pr.team
-                pr.urgency = urgency if urgency else pr.urgency
-                pr.reviewer = reviewer if reviewer else pr.reviewer
-                pr.assignee = assignee if assignee else pr.assignee
-                pr.added_changes = added_changes if added_changes else pr.added_changes
-                pr.removed_changes = removed_changes if removed_changes else pr.removed_changes
-                return pr
-        except Exception as e:
-            pr = PullRequest(owner=owner, title=title, group_name=group_name, team=team, reviewer=reviewer,
-                             assignee=assignee, urgency=urgency, added_changes=added_changes,
-                             removed_changes=removed_changes)
-            pr.set_in_db()
-            return pr
 
     @classmethod
     def get_all_prs(cls, filters: dict) -> Union[List['PullRequest'], None]:
@@ -142,7 +129,8 @@ class PullRequest:
             query['assignee_finished'] = True
         else:
             if '$or' in query:
-                query['$and'] = [{'$or': query['$or']}, {'$or': [{'review_finished': False}, {'assignee_finished': False}]}]
+                query['$and'] = [{'$or': query['$or']},
+                                 {'$or': [{'review_finished': False}, {'assignee_finished': False}]}]
                 del query['$or']
             else:
                 query['$or'] = [{'review_finished': False}, {'assignee_finished': False}]
@@ -162,3 +150,9 @@ class PullRequest:
                                                     {'$set': update_keys})
         except Exception as e:
             raise Exception(f'نتونستم پول ریکوئست {title} رو پیدا کنم! :(')
+
+    def __str__(self):
+        return (f'پی‌آر {self.title} با تغییرات +{self.added_changes}/-{self.removed_changes} از {self.owner}'
+                f' در تیم {self.team} با ریویوئر اول {self.reviewer} و ریویوئر دوم {self.assignee} و وضعیت '
+                f'{self.status} از جنس {self.urgency}'
+                )
