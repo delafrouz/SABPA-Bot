@@ -123,27 +123,35 @@ class PullRequest:
             return pr
 
     @classmethod
-    def get_all_prs(cls, group_name: str, **kwargs) -> Union[List['PullRequest'], None]:
+    def get_all_prs(cls, filters: dict) -> Union[List['PullRequest'], None]:
+        query = {}
+        if 'team' in filters and filters['team']['value']:
+            query['team'] = filters['team']['value']
+        if 'title' in filters and filters['title']['value']:
+            query['title'] = filters['title']['value']
+        if 'owner' in filters and filters['owner']['value']:
+            query['owner'] = filters['owner']['value']
+        if 'group_name' in filters and filters['group_name']['value']:
+            query['group_name'] = filters['group_name']['value']
+        if 'urgency' in filters and filters['urgency']['value']:
+            query['urgency'] = filters['urgency']['value']
+        if 'reviewer' in filters and filters['reviewer']['value']:
+            query['$or'] = [{'reviewer': filters['reviewer']['value']}, {'assignee': filters['reviewer']['value']}]
+        if 'finished' in filters and filters['finished']['value']:
+            query['review_finished'] = True
+            query['assignee_finished'] = True
+        else:
+            if '$or' in query:
+                query['$and'] = [{'$or': query['$or']}, {'$or': [{'review_finished': False}, {'assignee_finished': False}]}]
+                del query['$or']
+            else:
+                query['$or'] = [{'review_finished': False}, {'assignee_finished': False}]
         try:
-            db_prs = mongo_db[cls.PR_COLLECTION].find({'group_name': group_name, **kwargs})
+            db_prs = mongo_db[cls.PR_COLLECTION].find(query)
             prs = [PullRequest.from_json(db_pr) for db_pr in db_prs]
             return prs
         except Exception as e:
-            raise Exception(f'نتونستم پول ریکوئستی توی گروه {group_name} پیدا کنم! :(')
-
-    @classmethod
-    def get_user_reviews(cls, group_name: str, telegram_id: str, reviewer_confirmed: bool = True,
-                         review_finished: bool = False) -> Union[List['PullRequest'], None]:
-        return cls.get_all_prs(
-            group_name, reviewer=telegram_id, reviewer_confirmed=reviewer_confirmed, review_finished=review_finished
-        )
-
-    @classmethod
-    def get_user_assigns(cls, group_name: str, telegram_id: str, assignee_confirmed: bool = False,
-                         assign_finished: bool = False) -> Union[List['PullRequest'], None]:
-        return cls.get_all_prs(
-            group_name, reviewer=telegram_id, assignee_confirmed=assignee_confirmed, assign_finished=assign_finished
-        )
+            raise Exception(f'نتونستم پول ریکوئستی توی گروه {query["group_name"]} پیدا کنم! :(')
 
     def update_in_db(self, group_name: str, title: str):
         try:

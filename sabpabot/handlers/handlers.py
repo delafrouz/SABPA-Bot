@@ -37,7 +37,7 @@ HANDLERS = [
                      'ادامه وارد کنی تا مشخصات و اعضای اون تیم رو ببینی. اگر از فلگ -m استفاده کنی، باید آی‌دی یک '
                      'کاربر رو در ادامه وارد کنی تا تیم‌هایی که این کاربر عضوشه رو ببینی. هم‌زمان نمی‌تونی از هر دو '
                      'فلگ -t و -m استفاده کنی.',
-        'usage_sample': '/teams@SabpaBot or /teams@SabpaBot -t team_name or /teams@SabpaBot -m @member',
+        'usage_sample': '/teams@SabpaBot \nor /teams@SabpaBot -t team_name \nor /teams@SabpaBot -m @member',
     },
     {
         'command_name': 'review',
@@ -79,8 +79,16 @@ HANDLERS = [
         'command_name': 'prs',
         'handler_method': prs,
         'description': "Get the list of group's PRs",
-        'help_text': 'لیست تمام پی‌آرهای گروه رو بدون هیچ فلگی دریافت کنین',
-        'usage_sample': '/prs@SabpaBot',
+        'help_text': 'لیست تمام پی‌آرهای گروه رو دریافت کنین. این دستور هم با فلگ و هم بدون فلگ می‌تونه استفاده بشه. '
+                     'اگه فلگ -f رو خالی وارد کردید، لیست پی‌آرهای تمام‌شده برگردانده میشه، وگرنه فقط پی‌آرهای ناتمام رو'
+                     'نشون میدیم. اگه فلگ -o رو بزنین، لیست پی‌آرها محدود به پی‌آرهایی میشه که خودتون ایجاد کردید. '
+                     'اگه فلگ -t رو به همراه اسم تیم وارد کنین، پی‌آرهای داخل اون تیم نمایش داده میشن. اگه فلگ -r رو'
+                     'به همراه آی‌دی شخص مورد نظر وارد کنی، پی‌آرهایی که اون شخص ریویوئر اول یا دومش هست نمایش داده '
+                     'میشن. اگر فلگ -s با یک استتوس وارد بشه، پی‌آرهایی با اون استتوس بهتون نمایش داده میشن. در نهایت،'
+                     ' اگر فلگ -p رو به همراه شماره‌ی پی‌آر وارد کنی می‌تونی استتوس یک پی‌آر رو به طور خاص ببینی.',
+        'usage_sample': '/prs@SabpaBot \nor /prs@SabpaBot -f \nor /prs@SabpaBot -f -o \nor /prs@SabpaBot -f -r @Khodam'
+                        '\nor /prs@SabpaBot -o -r @Somebody -t core -s urgent \nor /prs@SabpaBot -f -p 1500'
+                        '\nor /prs@SabpaBot -p 1500',
     },
     {
         'command_name': 'help',

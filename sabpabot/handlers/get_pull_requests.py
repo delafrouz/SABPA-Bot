@@ -1,18 +1,15 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from sabpabot.data_models.pull_request import PullRequest
+from sabpabot.controllers.pull_request_controller import PullRequestController
 
 
 async def prs(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    input_message = update.message.text
+    text = input_message[input_message.find('-'):] if '-' in input_message else ''
     group_name = update.message.chat.title or update.message.from_user.username
-    prs = PullRequest.get_all_prs(group_name)
+    sender: str = update.message.from_user.username
+    sender = sender if sender.startswith('@') else f'@{sender}'
+    result = PullRequestController.get_prs(text, group_name, sender)
 
-    if not prs:
-        await update.message.reply_text('در حال حاضر هیچ پی‌آری ساخته نشده است.')
-        return
-    await update.message.reply_text(
-        'لیست پی‌آرهای گروه شما موجود در سامانه‌ی برنامه ریزی پی‌آر:\n- ' +
-        '\n- '.join(f'پی‌آر {pr.title} با تغییرات +{pr.added_changes}/-{pr.removed_changes} از {pr.owner} با ریویوئر '
-                    f'اول {pr.reviewer} و ریویوئر دوم {pr.assignee} و وضعیت {pr.status} از جنس {pr.urgency}' for pr
-                    in prs))
+    await update.message.reply_text(result)

@@ -17,6 +17,7 @@ class PullRequestController:
     TEAM_FLAG = '-t '
     STATUS_FLAG = '-s '
     CHANGE_FLAG = '-c '
+    FINISHED_FLAG = '-f '
 
     @dataclasses.dataclass
     class PR:
@@ -118,7 +119,6 @@ class PullRequestController:
 
         return f'کاربر {accepter.first_name} پی‌آر {pr.title} شما رو قبول کرد!! {pr.owner}'
 
-
     @classmethod
     def get_finish_response(cls,finisher_username: str, group_name: str, text: str) -> str:
         meaningful_text = text[text.find('-'):]
@@ -196,12 +196,13 @@ class PullRequestController:
 
         if pr_info['status']['value'] and pr_info['status']['value'] not in PR_URGENCY:
             raise Exception(f'استتوس پول ریکوئست باید جز {PR_URGENCY} باشه')
+        urgency = pr_info['status']['value'] if pr_info['status']['value'] else 'normal'
 
         pr = PullRequest.get_or_create(owner=owner.telegram_id,
                                        title=pr_info['title']['value'],
                                        group_name=group_name,
                                        team=team.name,
-                                       urgency=pr_info['status']['value'],
+                                       urgency=urgency,
                                        reviewer=reviewer.telegram_id,
                                        assignee=assignee.telegram_id,
                                        added_changes=added_changes,
@@ -308,7 +309,8 @@ class PullRequestController:
         else:
             final_candids = free_members
         print(f'final candids: ' + ', '.join(candid.full_name for candid in final_candids))
-
+        if not final_candids:
+            raise Exception('ریویوئر به تعداد کافی در این تیم نیست')
         random_reviewer = random.choice(final_candids)
         print(f'random reviewer is {random_reviewer.full_name}')
         return random_reviewer
@@ -335,3 +337,97 @@ class PullRequestController:
             if team.team_type == 'isolated':
                 if team not in owner_teams:
                     return team, True
+
+    @classmethod
+    def get_prs(cls, text: str, group_name: str, sender_username: str) -> str:
+        prs_info = cls._extract_get_prs_flags(text, group_name, sender_username)
+        prs = PullRequest.get_all_prs(prs_info)
+        if not prs:
+            return 'پی‌آری با این مشخصات در گروه شما پیدا نشد.'
+        return (
+                'لیست پی‌آرهای مد نظر شما موجود در سامانه‌ی برنامه ریزی پی‌آر:\n- ' +
+                '\n- '.join(
+                    f'پی‌آر {pr.title} با تغییرات +{pr.added_changes}/-{pr.removed_changes} از {pr.owner[1:]} با'
+                    f' ریویوئر اول {pr.reviewer[1:]} و ریویوئر دوم {pr.assignee[1:]} و وضعیت {pr.status} '
+                    f'از جنس {pr.urgency}' for pr in prs)
+        )
+
+    @classmethod
+    def _extract_get_prs_flags(cls, text: str, group_name: str, sender_username: str) -> dict:
+        flags_dict = {
+            'team': {
+                'value': '',
+                'flag': cls.TEAM_FLAG,
+                'necessary': False
+            },
+            'title': {
+                'value': '',
+                'flag': cls.TITLE_FLAG,
+                'necessary': False
+            },
+            'owner': {
+                'value': '',
+                'flag': cls.OWNER_FLAG,
+                'necessary': False
+            },
+            'group_name': {
+                'value': '',
+                'flag': None,
+                'necessary': False
+            },
+            'reviewer': {
+                'value': '',
+                'flag': cls.REVIEWER_FLAG,
+                'necessary': False
+            },
+            'urgency': {
+                'value': '',
+                'flag': cls.STATUS_FLAG,
+                'necessary': False
+            },
+            'finished': {
+                'value': False,
+                'flag': cls.FINISHED_FLAG,
+                'necessary': False
+            },
+        }
+
+        meaningful_text = text[text.find('-'):]
+        flags = ['-' + e for e in meaningful_text.split('-') if e]
+        flags_dict['group_name']['value'] = group_name
+
+        for flag in flags:
+            if flag.startswith('-p '):
+                if len(flag.split('-p ')) < 2:
+                    raise Exception('شماره‌ی پول‌ریکوئست رو درست وارد نکردی!')
+                flags_dict['title']['value'] = flag.split('-p ')[1].strip()
+
+            elif flag.startswith('-t '):
+                if len(flag.split('-t ')) < 2:
+                    raise Exception('تیم پول‌ریکوئست رو درست وارد نکردی!')
+                flags_dict['team']['value'] = flag.split('-t ')[1].strip()
+
+            elif flag.startswith('-s '):
+                if len(flag.split('-s ')) < 2:
+                    raise Exception('وضعیت ضرورت پول‌ریکوئست رو درست وارد نکردی!')
+                flags_dict['urgency']['value'] = flag.split('-s ')[1].strip()
+
+            elif flag.startswith('-r '):
+                if len(flag.split('-r ')) < 2:
+                    raise Exception('ریویوئر پول‌ریکوئست رو درست وارد نکردی!')
+                flags_dict['reviewer']['value'] = flag.split('-r ')[1].strip()
+
+            elif flag.startswith('-f ') or flag.endswith('-f'):
+                flags_dict['finished']['value'] = True
+
+            elif flag.startswith('-o ') or flag.endswith('-o'):
+                flags_dict['owner']['value'] = sender_username
+
+            elif not flag:
+                continue
+
+            else:
+                raise Exception('این پیغام رو بلد نبودم هندل کنم. برای راهنمایی دوباره /help رو ببین.')
+
+        return flags_dict
+
