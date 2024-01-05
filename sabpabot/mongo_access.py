@@ -10,4 +10,4 @@ DB_HOST = os.getenv('DB_HOST')
 DB_URL = f'mongodb+srv://{DB_USER}:{DB_PASSWORD}@{DB_NAME}.{DB_HOST}.mongodb.net/'
 
 client = MongoClient(DB_URL)
-mongo_db = client.Sabpa
+mongo_db = client[DB_NAME]
