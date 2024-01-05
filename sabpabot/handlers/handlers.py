@@ -6,16 +6,8 @@ from sabpabot.handlers.get_teams import get_teams
 from sabpabot.handlers.get_users import users
 from sabpabot.handlers.help import get_help
 from sabpabot.handlers.request_review import review
-from sabpabot.handlers.start import start
 
 HANDLERS = [
-    {
-        'command_name': 'start',
-        'handler_method': start,
-        'description': '',
-        'help_text': 'دستور آغاز به کار بات',
-        'usage_sample': '/start@SabpaBot',
-    },
     {
         'command_name': 'addteam',
         'handler_method': add_team,
