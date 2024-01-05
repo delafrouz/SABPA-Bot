@@ -152,7 +152,13 @@ class PullRequest:
             raise Exception(f'نتونستم پول ریکوئست {title} رو پیدا کنم! :(')
 
     def __str__(self):
+        reviewer_str = f'{"با" if self.reviewer else "بدون"} ریویوئر اول{" " if self.reviewer else ""}{self.reviewer}'
+        assignee_str = f'{"با" if self.assignee else "بدون"} ریویوئر دوم{" " if self.assignee else ""}{self.assignee}'
         return (f'پی‌آر {self.title} با تغییرات +{self.added_changes}/-{self.removed_changes} از {self.owner}'
-                f' در تیم {self.team} با ریویوئر اول {self.reviewer} و ریویوئر دوم {self.assignee} و وضعیت '
+                f' در تیم {self.team} {reviewer_str} و {assignee_str} و وضعیت '
                 f'{self.status} از جنس {self.urgency}'
                 )
+
+    @classmethod
+    def get_workload(cls, added_changes, removed_changes) -> Decimal:
+        return Decimal(math.ceil((added_changes + removed_changes) / cls.PR_LINE_TO_POINT)) * Decimal(0.1)

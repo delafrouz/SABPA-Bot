@@ -204,7 +204,7 @@ class PullRequestController:
 
         full_pr = cls.find_reviewer(
             pr=pr, pr_info=pr_info, current_reviewer=reviewer, proposed_reviewer=pr_info['reviewer']['value'],
-            current_assignee=assignee, proposed_assignee=['assignee']['value']
+            current_assignee=assignee, proposed_assignee=pr_info['assignee']['value']
         )
 
         _, is_reviewer_isolated = cls.is_reviewer_isolated(full_pr, full_pr.reviewer)
@@ -259,7 +259,8 @@ class PullRequestController:
             added_changes=added_changes, removed_changes=removed_changes
         )
         pr.set_in_db()
-        return cls.PR(pull_request=pr, team=full_pr.team, owner=full_pr.owner, reviewer=full_pr.reviewer, assignee=full_pr.assignee)
+        return cls.PR(pull_request=pr, team=full_pr.team, owner=full_pr.owner, reviewer=full_pr.reviewer,
+                      assignee=full_pr.assignee)
 
     @classmethod
     def find_reviewer(cls, pr: Optional[PullRequest], pr_info: dict,
@@ -274,6 +275,12 @@ class PullRequestController:
         if not team:
             raise Exception('تیم پول‌ریکوئست رو درست وارد نکردی!')
 
+        added_changes = int(pr_info['changes']['value'].split()[0].strip()) if not pr else pr.added_changes
+        removed_changes = int(pr_info['changes']['value'].split()[1].strip()) if not pr else pr.removed_changes
+        if added_changes < 0 or removed_changes < 0:
+            raise Exception('تعداد خطوط تغییرات نمی‌تونه منفی باشه!')
+        workload = pr.workload if pr else PullRequest.get_workload(added_changes, removed_changes)
+
         if proposed_reviewer and proposed_reviewer != 'random':
             if proposed_reviewer == pr_info['owner']['value']:
                 raise Exception('نمی‌تونی خودت ریویوئر پول ریکوئست خودت باشی که!')
@@ -282,10 +289,19 @@ class PullRequestController:
             if proposed_assignee == pr_info['owner']['value']:
                 raise Exception('نمی‌تونی خودت ریویوئر پول ریکوئست خودت باشی که!')
             current_assignee = User.get_from_db(pr_info['group']['value'], proposed_assignee)
+
         if proposed_reviewer == 'random':
             current_reviewer = cls.choose_random_reviewer(team, owner, current_assignee)
+        if (pr and pr.reviewer != current_reviewer) or not pr:
+            current_reviewer.workload += workload
+            current_reviewer.update_in_db(pr_info['group']['value'], current_reviewer.telegram_id)
+
         if proposed_assignee == 'random':
             current_assignee = cls.choose_random_reviewer(team, owner, current_reviewer)
+        if (pr and pr.assignee != current_assignee) or not pr:
+            current_assignee.workload += workload
+            current_assignee.update_in_db(pr_info['group']['value'], current_assignee.telegram_id)
+
         return cls.PR(pull_request=pr, team=team, owner=owner, reviewer=current_reviewer, assignee=current_assignee)
 
     @classmethod
@@ -328,14 +344,15 @@ class PullRequestController:
             if team.team_type == 'isolated':
                 if team not in owner_teams:
                     return team, True
+        return None, False
 
     @classmethod
-    def get_accept_response(cls, accepter_username: str, group_name: str, text: str) -> str:
+    def get_reject_response(cls, rejecter_username: str, group_name: str, text: str) -> str:
         meaningful_text = text[text.find('-'):]
         flags = ['-' + e for e in meaningful_text.split('-') if e]
         title = ''
-        accepter_username = accepter_username if accepter_username.startswith('@') else f'@{accepter_username}'
-        accepter = User.get_from_db(group_name, accepter_username)
+        rejecter_username = rejecter_username if rejecter_username.startswith('@') else f'@{rejecter_username}'
+        rejecter = User.get_from_db(group_name, rejecter_username)
 
         for flag in flags:
             if flag.startswith('-p '):
@@ -350,23 +367,23 @@ class PullRequestController:
         if not pr:
             raise Exception(f'پی‌آر با شماره‌ی {title} پیدا نکردم!')
 
-        if accepter.telegram_id == pr.reviewer:
-            if not pr.reviewer_confirmed:
-                pr.reviewer_confirmed = True
-                pr.update_in_db(group_name, title)
-                accepter.workload += pr.workload
-        if accepter.telegram_id == pr.assignee:
-            if not pr.assignee_confirmed:
-                pr.assignee_confirmed = True
-                pr.update_in_db(group_name, title)
-                if pr.assignee != pr.reviewer:
-                    accepter.workload += pr.workload
-        if not (accepter.telegram_id == pr.reviewer or accepter.telegram_id == pr.assignee):
-            raise Exception(f'شما ریویوئر پی‌آر با شماره‌ی {title} نیستی!')
+        if not (rejecter.telegram_id == pr.reviewer or rejecter.telegram_id == pr.assignee):
+            raise Exception(f'شما ریویوئر پی‌آر با شماره‌ی {title} نیستی یا امکان ریجکت کردنشو نداری!')
+        if rejecter.telegram_id == pr.reviewer and pr.can_reviewer_reject:
+            pr.reviewer_confirmed = False
+            pr.reviewer = None
+            pr.update_in_db(group_name, title)
+            rejecter.workload -= pr.workload
+        if rejecter.telegram_id == pr.assignee and pr.can_assignee_reject:
+            pr.assignee_confirmed = False
+            pr.assignee = None
+            pr.update_in_db(group_name, title)
+            if pr.assignee != pr.reviewer:
+                rejecter.workload -= pr.workload
 
-        accepter.update_in_db(group_name, accepter.telegram_id)
+        rejecter.update_in_db(group_name, rejecter.telegram_id)
 
-        return f'کاربر {accepter.first_name} پی‌آر {pr.title} شما رو قبول کرد!! {pr.owner}'
+        return f'کاربر {rejecter.first_name} پی‌آر {pr.title} شما رو رد کرد!! لطفاً یه بار دیگه ریویوئر انتخاب کن. {pr.owner}'
 
     @classmethod
     def get_finish_response(cls, finisher_username: str, group_name: str, text: str) -> str:

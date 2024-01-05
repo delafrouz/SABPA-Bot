@@ -1,4 +1,4 @@
-from sabpabot.handlers.accept_review import accept
+from sabpabot.handlers.reject_review import reject
 from sabpabot.handlers.add_team import add_team
 from sabpabot.handlers.finish_review import finish
 from sabpabot.handlers.get_pull_requests import prs
@@ -53,12 +53,12 @@ HANDLERS = [
                         'first_reviewer_id|random -a second_reviewer_id|random -c 150 50',
     },
     {
-        'command_name': 'accept',
-        'handler_method': accept,
-        'description': 'Accept a PR review request',
-        'help_text': 'برای قبول درخواست ریویویی که اومده سمتتون می‌تونین از این کامند استفاده کنین. با فلگ اجباری -p '
+        'command_name': 'reject',
+        'handler_method': reject,
+        'description': 'Reject a PR review request',
+        'help_text': 'برای رد کردن درخواست ریویویی که اومده سمتتون می‌تونین از این کامند استفاده کنین. با فلگ اجباری -p '
                      'شماره‌ی پول‌ریکوئست رو مشخص کنین.',
-        'usage_sample': '/accept@SabpaBot -p pr_number',
+        'usage_sample': '/reject@SabpaBot -p pr_number',
     },
     {
         'command_name': 'finish',
