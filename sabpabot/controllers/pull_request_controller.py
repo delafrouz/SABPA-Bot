@@ -369,21 +369,32 @@ class PullRequestController:
 
         if not (rejecter.telegram_id == pr.reviewer or rejecter.telegram_id == pr.assignee):
             raise Exception(f'شما ریویوئر پی‌آر با شماره‌ی {title} نیستی یا امکان ریجکت کردنشو نداری!')
+        rejected = False
         if rejecter.telegram_id == pr.reviewer and pr.can_reviewer_reject:
-            pr.reviewer_confirmed = False
-            pr.reviewer = None
-            pr.update_in_db(group_name, title)
-            rejecter.workload -= pr.workload
-        if rejecter.telegram_id == pr.assignee and pr.can_assignee_reject:
-            pr.assignee_confirmed = False
-            pr.assignee = None
-            pr.update_in_db(group_name, title)
-            if pr.assignee != pr.reviewer:
+            if not pr.review_finished:
+                rejected = True
+                pr.reviewer_confirmed = False
+                pr.reviewer = None
+                pr.update_in_db(group_name, title)
                 rejecter.workload -= pr.workload
-
+            else:
+                raise Exception('ریویوی این پی‌آر رو تموم کردی')
+        if rejecter.telegram_id == pr.assignee and pr.can_assignee_reject:
+            if not pr.assign_finished:
+                rejected = True
+                pr.assignee_confirmed = False
+                pr.assignee = None
+                pr.update_in_db(group_name, title)
+                if pr.assignee != pr.reviewer:
+                    rejecter.workload -= pr.workload
+                else:
+                    raise Exception('ریویوی این پی‌آر رو تموم کردی')
         rejecter.update_in_db(group_name, rejecter.telegram_id)
 
-        return f'کاربر {rejecter.first_name} پی‌آر {pr.title} شما رو رد کرد!! لطفاً یه بار دیگه ریویوئر انتخاب کن. {pr.owner}'
+        if rejected:
+            return f'کاربر {rejecter.first_name} پی‌آر {pr.title} شما رو رد کرد!!' \
+                   f' لطفاً یه بار دیگه ریویوئر انتخاب کن. {pr.owner}'
+        return 'ریجکت کردن این پی‌آر برای شما ممکن نیست. ولی می‌تونی از صاحب پی‌آر بخوای ریویوئر رو عوض کنه.'
 
     @classmethod
     def get_finish_response(cls, finisher_username: str, group_name: str, text: str) -> str:

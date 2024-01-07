@@ -23,7 +23,7 @@ HANDLERS = [
     {
         'command_name': 'teams',
         'handler_method': get_teams,
-        'description': 'Get the list of all teams and their info',
+        'description': 'Get the list of teams and their info',
         'help_text': 'برای گرفتن لیست تیم های گروه از این دستور استفاده کن. در صورتی که این کامند رو بدون هیچ فلگی '
                      'استفاده کنی، لیست تمام تیم‌های گروه رو میده. اگر با فلگ -t استفاده کنی، باید اسم یک تیم رو در '
                      'ادامه وارد کنی تا مشخصات و اعضای اون تیم رو ببینی. اگر از فلگ -m استفاده کنی، باید آی‌دی یک '
