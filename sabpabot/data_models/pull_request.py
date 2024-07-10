@@ -152,8 +152,10 @@ class PullRequest:
             raise Exception(f'نتونستم پول ریکوئست {title} رو پیدا کنم! :(')
 
     def __str__(self):
-        reviewer_str = f'{"با" if self.reviewer else "بدون"} ریویوئر اول{" " if self.reviewer else ""}{self.reviewer}'
-        assignee_str = f'{"با" if self.assignee else "بدون"} ریویوئر دوم{" " if self.assignee else ""}{self.assignee}'
+        reviewer = (self.reviewer[1:] if self.review_finished else self.reviewer) if self.reviewer else None
+        assignee = (self.assignee[1:] if self.assign_finished else self.assignee) if self.assignee else None
+        reviewer_str = f'{"با" if reviewer else "بدون"} ریویوئر اول{" " if reviewer else ""}{reviewer}'
+        assignee_str = f'{"با" if assignee else "بدون"} ریویوئر دوم{" " if assignee else ""}{assignee}'
         return (f'پی‌آر {self.title} با تغییرات +{self.added_changes}/-{self.removed_changes} از {self.owner}'
                 f' در تیم {self.team} {reviewer_str} و {assignee_str} و وضعیت '
                 f'{self.status} از جنس {self.urgency}'
