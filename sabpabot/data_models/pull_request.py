@@ -1,6 +1,6 @@
 import math
 from decimal import Decimal
-from typing import Union, List, Dict
+from typing import Dict, List, Union
 
 from sabpabot.mongo_access import mongo_db
 
@@ -123,7 +123,10 @@ class PullRequest:
         if 'urgency' in filters and filters['urgency']['value']:
             query['urgency'] = filters['urgency']['value']
         if 'reviewer' in filters and filters['reviewer']['value']:
-            query['$or'] = [{'reviewer': filters['reviewer']['value']}, {'assignee': filters['reviewer']['value']}]
+            query['$or'] = [
+                {'reviewer': filters['reviewer']['value'], 'review_finished': False},
+                {'assignee': filters['reviewer']['value'], 'assign_finished': False}
+            ]
         if 'finished' in filters and filters['finished']['value']:
             query['review_finished'] = True
             query['assignee_finished'] = True
