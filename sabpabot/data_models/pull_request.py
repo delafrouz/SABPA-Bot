@@ -2,6 +2,7 @@ import math
 from decimal import Decimal
 from typing import Dict, List, Union
 
+from sabpabot.handlers.request_review import review
 from sabpabot.mongo_access import mongo_db
 
 PR_URGENCY = {'normal', 'urgent', 'critical'}
@@ -122,21 +123,17 @@ class PullRequest:
             query['group_name'] = filters['group_name']['value']
         if 'urgency' in filters and filters['urgency']['value']:
             query['urgency'] = filters['urgency']['value']
+        finished = filters['finished']['value'] if 'finished' in filters else False
         if 'reviewer' in filters and filters['reviewer']['value']:
             query['$or'] = [
-                {'reviewer': filters['reviewer']['value'], 'review_finished': False},
-                {'assignee': filters['reviewer']['value'], 'assign_finished': False}
+                {'reviewer': filters['reviewer']['value'], 'review_finished': finished},
+                {'assignee': filters['reviewer']['value'], 'assign_finished': finished},
             ]
-        if 'finished' in filters and filters['finished']['value']:
+        elif finished:
             query['review_finished'] = True
             query['assign_finished'] = True
         else:
-            if '$or' in query:
-                query['$and'] = [{'$or': query['$or']},
-                                 {'$or': [{'review_finished': False}, {'assign_finished': False}]}]
-                del query['$or']
-            else:
-                query['$or'] = [{'review_finished': False}, {'assign_finished': False}]
+            query['$or'] = [{'review_finished': False}, {'assign_finished': False}]
         try:
             db_prs = mongo_db[cls.PR_COLLECTION].find(query)
             prs = [PullRequest.from_json(db_pr) for db_pr in db_prs]
