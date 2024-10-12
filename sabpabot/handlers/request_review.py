@@ -1,9 +1,10 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 
+from sabpabot.controllers.pull_request_controller import PullRequestController
+
 
 async def review(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    from sabpabot.controllers.pull_request_controller import PullRequestController
 
     input_message = update.message.text
     owner: str = update.message.from_user.username

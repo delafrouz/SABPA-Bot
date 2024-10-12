@@ -2,7 +2,6 @@ import math
 from decimal import Decimal
 from typing import Dict, List, Union
 
-from sabpabot.handlers.request_review import review
 from sabpabot.mongo_access import mongo_db
 
 PR_URGENCY = {'normal', 'urgent', 'critical'}
