@@ -129,14 +129,14 @@ class PullRequest:
             ]
         if 'finished' in filters and filters['finished']['value']:
             query['review_finished'] = True
-            query['assignee_finished'] = True
+            query['assign_finished'] = True
         else:
             if '$or' in query:
                 query['$and'] = [{'$or': query['$or']},
-                                 {'$or': [{'review_finished': False}, {'assignee_finished': False}]}]
+                                 {'$or': [{'review_finished': False}, {'assign_finished': False}]}]
                 del query['$or']
             else:
-                query['$or'] = [{'review_finished': False}, {'assignee_finished': False}]
+                query['$or'] = [{'review_finished': False}, {'assign_finished': False}]
         try:
             db_prs = mongo_db[cls.PR_COLLECTION].find(query)
             prs = [PullRequest.from_json(db_pr) for db_pr in db_prs]
