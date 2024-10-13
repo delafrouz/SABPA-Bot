@@ -151,12 +151,13 @@ class PullRequest:
             raise Exception(f'نتونستم پول ریکوئست {title} رو پیدا کنم! :(')
 
     def __str__(self):
-        reviewer_str = f'{"با" if self.reviewer else "بدون"} ریویوئر اول{" " if self.reviewer else ""}{self.reviewer}'
-        assignee_str = f'{"با" if self.assignee else "بدون"} ریویوئر دوم{" " if self.assignee else ""}{self.assignee}'
+        reviewer_str = self.reviewer.replace('_', '\_') if self.reviewer else 'نامشخص'
+        assignee_str = self.assignee.replace('_', '\_') if self.assignee else 'نامشخص'
         pr_link = f'[{self.title}](https://github.com/nobitex/core/pull/{self.title})'
+        status_str = self.status.replace('_', '\_')
         return (f'پی‌آر {pr_link} با تغییرات +{self.added_changes}/-{self.removed_changes} از {self.owner}'
-                f' در تیم {self.team} {reviewer_str} و {assignee_str} و وضعیت '
-                f'{self.status} از جنس {self.urgency}'
+                f' در تیم {self.team} با ریویوئر اول {reviewer_str} و ریویوئر دوم {assignee_str} و وضعیت '
+                f'{status_str} از جنس {self.urgency}'
                 )
 
     @classmethod

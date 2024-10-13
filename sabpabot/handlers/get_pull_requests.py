@@ -1,4 +1,5 @@
 from telegram import Update
+from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
 from sabpabot.controllers.pull_request_controller import PullRequestController
@@ -12,4 +13,4 @@ async def prs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sender = sender if sender.startswith('@') else f'@{sender}'
     result = PullRequestController.get_prs(text, group_name, sender)
 
-    await update.message.reply_text(result)
+    await update.message.reply_text(result, parse_mode=ParseMode.MARKDOWN)
