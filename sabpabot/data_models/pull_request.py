@@ -151,13 +151,17 @@ class PullRequest:
             raise Exception(f'نتونستم پول ریکوئست {title} رو پیدا کنم! :(')
 
     def __str__(self):
-        reviewer_str = f'{"با" if self.reviewer else "بدون"} ریویوئر اول{" " if self.reviewer else ""}{self.reviewer}'
-        assignee_str = f'{"با" if self.assignee else "بدون"} ریویوئر دوم{" " if self.assignee else ""}{self.assignee}'
+        reviewer_str = self.reviewer.replace('_', '\_') if self.reviewer else 'نامشخص'
+        assignee_str = self.assignee.replace('_', '\_') if self.assignee else 'نامشخص'
+        if self.review_finished:
+            reviewer_str = reviewer_str.replace('@', '')
+        if self.assign_finished:
+            assignee_str = assignee_str.replace('@', '')
         pr_link = f'[{self.title}](https://github.com/nobitex/core/pull/{self.title})'
-        return (f'پی‌آر {pr_link} با تغییرات +{self.added_changes}/-{self.removed_changes} از {self.owner}'
-                f' در تیم {self.team} {reviewer_str} و {assignee_str} و وضعیت '
-                f'{self.status} از جنس {self.urgency}'
-                )
+        status_str = self.status.replace('_', '\_')
+        icon = '🔹' if self.urgency == 'normal' else '🔺'
+        return (f'{icon}پی‌آر {pr_link} با تغییرات +{self.added_changes}/-{self.removed_changes} از {self.owner}'
+                f' در تیم {self.team} با ریویوئر اول {reviewer_str} و ریویوئر دوم {assignee_str} و وضعیت {status_str}')
 
     @classmethod
     def get_workload(cls, added_changes, removed_changes) -> Decimal:

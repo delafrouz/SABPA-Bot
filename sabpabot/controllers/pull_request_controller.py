@@ -33,7 +33,8 @@ class PullRequestController:
         pr, created = cls._get_or_create_pull_request(text=text, group_name=group_name, owner_username=owner_username)
 
         if not created:
-            return f'تغییرات به صورت زیر اعمال شد:\n{str(pr.pull_request)}'
+            pr_str = str(pr.pull_request).replace("\_", "_")
+            return f'تغییرات به صورت زیر اعمال شد:\n{pr_str}'
 
         reviewer_response = ''
         assignee_response = ''
@@ -449,8 +450,8 @@ class PullRequestController:
         if not prs:
             return 'پی‌آری با این مشخصات در گروه شما پیدا نشد.'
         return (
-                'لیست پی‌آرهای مد نظر شما موجود در سامانه‌ی برنامه ریزی پی‌آر:\n- ' +
-                '\n- '.join(str(pr) for pr in prs)
+                'لیست پی‌آرهای مد نظر شما موجود در سامانه‌ی برنامه ریزی پی‌آر:\n' +
+                '\n'.join(str(pr) for pr in prs)
         )
 
     @classmethod
