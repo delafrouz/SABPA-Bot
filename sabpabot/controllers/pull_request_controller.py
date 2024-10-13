@@ -33,7 +33,8 @@ class PullRequestController:
         pr, created = cls._get_or_create_pull_request(text=text, group_name=group_name, owner_username=owner_username)
 
         if not created:
-            return f'تغییرات به صورت زیر اعمال شد:\n{str(pr.pull_request)}'
+            pr_str = str(pr.pull_request).replace("\_", "_")
+            return f'تغییرات به صورت زیر اعمال شد:\n{pr_str}'
 
         reviewer_response = ''
         assignee_response = ''
