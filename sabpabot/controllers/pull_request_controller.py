@@ -449,8 +449,8 @@ class PullRequestController:
         if not prs:
             return 'پی‌آری با این مشخصات در گروه شما پیدا نشد.'
         return (
-                'لیست پی‌آرهای مد نظر شما موجود در سامانه‌ی برنامه ریزی پی‌آر:\n- ' +
-                '\n- '.join(str(pr) for pr in prs)
+                'لیست پی‌آرهای مد نظر شما موجود در سامانه‌ی برنامه ریزی پی‌آر:\n' +
+                '\n'.join(str(pr) for pr in prs)
         )
 
     @classmethod

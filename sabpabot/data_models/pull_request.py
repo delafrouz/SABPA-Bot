@@ -155,10 +155,9 @@ class PullRequest:
         assignee_str = self.assignee.replace('_', '\_') if self.assignee else 'نامشخص'
         pr_link = f'[{self.title}](https://github.com/nobitex/core/pull/{self.title})'
         status_str = self.status.replace('_', '\_')
-        return (f'پی‌آر {pr_link} با تغییرات +{self.added_changes}/-{self.removed_changes} از {self.owner}'
-                f' در تیم {self.team} با ریویوئر اول {reviewer_str} و ریویوئر دوم {assignee_str} و وضعیت '
-                f'{status_str} از جنس {self.urgency}'
-                )
+        icon = '🔹' if self.urgency == 'normal' else '🔺'
+        return (f'{icon}پی‌آر {pr_link} با تغییرات +{self.added_changes}/-{self.removed_changes} از {self.owner}'
+                f' در تیم {self.team} با ریویوئر اول {reviewer_str} و ریویوئر دوم {assignee_str} و وضعیت {status_str}')
 
     @classmethod
     def get_workload(cls, added_changes, removed_changes) -> Decimal:
