@@ -153,6 +153,10 @@ class PullRequest:
     def __str__(self):
         reviewer_str = self.reviewer.replace('_', '\_') if self.reviewer else 'نامشخص'
         assignee_str = self.assignee.replace('_', '\_') if self.assignee else 'نامشخص'
+        if self.review_finished:
+            reviewer_str = reviewer_str.replace('@', '')
+        if self.assign_finished:
+            assignee_str = assignee_str.replace('@', '')
         pr_link = f'[{self.title}](https://github.com/nobitex/core/pull/{self.title})'
         status_str = self.status.replace('_', '\_')
         icon = '🔹' if self.urgency == 'normal' else '🔺'
