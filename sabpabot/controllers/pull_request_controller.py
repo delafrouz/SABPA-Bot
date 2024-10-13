@@ -159,7 +159,7 @@ class PullRequestController:
             elif flag.startswith('-s '):
                 if len(flag.split('-s ')) < 2:
                     raise Exception('استتوس پول‌ریکوئست رو درست وارد نکردی!')
-                flags_dict['status']['value'] = flag.split('-t ')[1].strip()
+                flags_dict['status']['value'] = flag.split('-s ')[1].strip()
 
             elif flag.startswith('-r '):
                 if len(flag.split('-r ')) < 2:
