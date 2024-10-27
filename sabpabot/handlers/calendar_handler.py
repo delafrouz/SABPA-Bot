@@ -8,7 +8,7 @@ from telegram_bot_calendar import DetailedTelegramCalendar, LSTEP
 bot = telebot.TeleBot(TOKEN, parse_mode=None)
 
 
-@bot.message_handler(commands=['delafrouz'])
+@bot.message_handler(commands=['start'])
 def start(m):
     calendar, step = DetailedTelegramCalendar().build()
     bot.send_message(m.chat.id,
