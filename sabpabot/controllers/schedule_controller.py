@@ -1,0 +1,2 @@
+class ScheduleController:
+    pass
