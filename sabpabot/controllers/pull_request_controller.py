@@ -193,15 +193,12 @@ class PullRequestController:
         reviewer, assignee = None, None
         if pr.reviewer:
             reviewer = User.get_from_db(pr.group_name, pr.reviewer)
-        else:
-            pr_info['reviewer']['necessary'] = True
+        elif not pr_info['reviewer']['value']:
+            pr_info['reviewer']['value'] = 'random'
         if pr.assignee:
             assignee = User.get_from_db(pr.group_name, pr.assignee)
-        else:
-            pr_info['assignee']['necessary'] = True
-        for flag in pr_info:
-            if pr_info[flag]['flag'] and pr_info[flag]['necessary'] and not pr_info[flag]['value']:
-                raise Exception(f'فلگ {pr_info[flag]["flag"]} اجیاریه. لطفاً دوباره تلاش کن.')
+        elif not pr_info['assignee']['value']:
+            pr_info['assignee']['value'] = 'random'
 
         full_pr = cls.find_reviewer(
             pr=pr, pr_info=pr_info, current_reviewer=reviewer, proposed_reviewer=pr_info['reviewer']['value'],
@@ -226,16 +223,14 @@ class PullRequestController:
     @classmethod
     def _create_pull_request(cls, group_name: str, pr_info: dict) -> PR:
         pr_info['team']['necessary'] = True
-        pr_info['reviewer']['necessary'] = True
-        pr_info['assignee']['necessary'] = True
         pr_info['changes']['necessary'] = True
         for flag in pr_info:
             if pr_info[flag]['flag'] and pr_info[flag]['necessary'] and not pr_info[flag]['value']:
                 raise Exception(f'فلگ {pr_info[flag]["flag"]} اجیاریه. لطفاً دوباره تلاش کن.')
 
         full_pr = cls.find_reviewer(
-            pr=None, pr_info=pr_info, current_reviewer=None, proposed_reviewer=pr_info['reviewer']['value'],
-            current_assignee=None, proposed_assignee=pr_info['assignee']['value']
+            pr=None, pr_info=pr_info, current_reviewer=None, proposed_reviewer=pr_info['reviewer']['value'] or 'random',
+            current_assignee=None, proposed_assignee=pr_info['assignee']['value'] or 'random'
         )
 
         added_changes = int(pr_info['changes']['value'].split()[0].strip())
