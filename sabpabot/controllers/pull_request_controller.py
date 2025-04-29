@@ -303,9 +303,11 @@ class PullRequestController:
             current_assignee.workload += workload
             current_assignee.update_in_db(pr_info['group']['value'], current_assignee.telegram_id)
 
-        if pr:
+        if pr and pr.reviewer != current_reviewer:
             pr.reviewer.workload -= workload
             pr.reviewer.update_in_db(pr_info['group']['value'], pr.reviewer.telegram_id)
+
+        if pr and pr.assignee != current_assignee:
             pr.assignee.workload -= workload
             pr.assignee.update_in_db(pr_info['group']['value'], pr.assignee.telegram_id)
 
