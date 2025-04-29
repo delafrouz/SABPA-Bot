@@ -303,6 +303,12 @@ class PullRequestController:
             current_assignee.workload += workload
             current_assignee.update_in_db(pr_info['group']['value'], current_assignee.telegram_id)
 
+        if pr:
+            pr.reviewer.workload -= workload
+            pr.reviewer.update_in_db(pr_info['group']['value'], pr.reviewer.telegram_id)
+            pr.assignee.workload -= workload
+            pr.assignee.update_in_db(pr_info['group']['value'], pr.assignee.telegram_id)
+
         return cls.PR(pull_request=pr, team=team, owner=owner, reviewer=current_reviewer, assignee=current_assignee)
 
     @classmethod
