@@ -34,7 +34,7 @@ class PullRequest:
 
     @property
     def workload(self) -> Decimal:
-        return Decimal(math.ceil((self.added_changes + self.removed_changes) / self.PR_LINE_TO_POINT)) * Decimal(0.1)
+        return self.get_workload(self.added_changes, self.removed_changes)
 
     @property
     def status(self) -> str:
