@@ -304,11 +304,11 @@ class PullRequestController:
             current_assignee.update_in_db(pr_info['group']['value'], current_assignee.telegram_id)
 
         if pr and pr.reviewer != current_reviewer:
-            pr.reviewer.workload -= workload
+            pr.reviewer.workload = max(pr.reviewer.workload - workload, Decimal('0'))
             pr.reviewer.update_in_db(pr_info['group']['value'], pr.reviewer.telegram_id)
 
         if pr and pr.assignee != current_assignee:
-            pr.assignee.workload -= workload
+            pr.assignee.workload = max(pr.assignee.workload - workload, Decimal('0'))
             pr.assignee.update_in_db(pr_info['group']['value'], pr.assignee.telegram_id)
 
         return cls.PR(pull_request=pr, team=team, owner=owner, reviewer=current_reviewer, assignee=current_assignee)
@@ -385,7 +385,7 @@ class PullRequestController:
                 pr.reviewer_confirmed = False
                 pr.reviewer = None
                 pr.update_in_db(group_name, title)
-                rejecter.workload -= pr.workload
+                rejecter.workload = max(rejecter.workload - pr.workload, Decimal('0'))
             else:
                 raise Exception('ریویوی این پی‌آر رو تموم کردی')
         if rejecter.telegram_id == pr.assignee and pr.can_assignee_reject:
@@ -395,7 +395,7 @@ class PullRequestController:
                 pr.assignee = None
                 pr.update_in_db(group_name, title)
                 if pr.assignee != pr.reviewer:
-                    rejecter.workload -= pr.workload
+                    rejecter.workload = max(rejecter.workload - pr.workload, Decimal('0'))
                 else:
                     raise Exception('ریویوی این پی‌آر رو تموم کردی')
         rejecter.update_in_db(group_name, rejecter.telegram_id)
